@@ -1,0 +1,31 @@
+Build a full-stack Python web application for "MediaCraft AI" — an automated post-production and media processing agent for filmmakers.
+
+Target Outcome:
+Help filmmakers and video editors process media using natural language, automatically catching and self-healing broken FFmpeg execution scripts in real time.
+
+Design & UI Requirements:
+1. Theme Switcher:
+   - 3-way toggle: Light Mode, Dark Mode, and System Default (listens to system prefers-color-scheme). Save selection in localStorage.
+2. Color Palette (White, Blue, Yellow, Red, Black blend):
+   - Primary Accent: Blue and Yellow gradient blend (`#1E40AF` to `#FACC15`).
+   - Light Theme: White background (`#FFFFFF`), Soft Slate Gray cards, Navy Blue text, Electric Blue primary buttons, Yellow hover highlights, Red error badges.
+   - Dark Theme: Deep Black/Navy background (`#0D1117`), Dark Gray surface cards, High-contrast White text, Neon Blue borders, Gold glowing highlights, Crimson Red error badges.
+
+Core Application Features:
+1. Dashboard UI:
+   - Top navbar with MediaCraft AI logo (Blue/Yellow gradient), theme switcher dropdown, and system status indicator.
+   - File drag-and-drop uploader supporting video/audio (.mp4, .mov, .mp3).
+   - Quick Action Presets: "Convert to 9:16 Vertical Reel", "Extract Audio (MP3)", "Burn Subtitles", "Compress Video Size".
+   - Custom Natural Language Input field for custom processing requests.
+2. Backend (Python FastAPI or Flask):
+   - Integrated with Google Gemini API (`google-genai`).
+   - Runs local system FFmpeg commands against uploaded assets.
+3. Self-Healing Execution Pipeline:
+   - Translates natural language requests into FFmpeg commands via Gemini.
+   - Executes commands inside the server container.
+   - If execution fails (non-zero exit code), intercepts stderr logs, feeds them back to Gemini to diagnose and rewrite the command, and re-executes until success.
+4. Output & Live Log Inspector:
+   - Video preview player for processed output with a direct Download button.
+   - Live visual execution log showing step-by-step progress: RED when execution breaks, GOLD when Gemini diagnoses & self-heals, and GREEN when successful.
+
+Please start by giving me a clean, step-by-step build plan first.
