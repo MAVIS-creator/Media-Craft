@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "MediaCraft AI"
+description = "A filmmaker-focused media processing workspace that turns natural-language requests into FFmpeg jobs, surfaces live execution logs, and self-heals failed commands with Gemini."
+version = "1.0.0"
+id = "artifacts/media-craft-ai"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18813
+
+[services.development]
+run = "pnpm --filter @workspace/media-craft-ai run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/media-craft-ai", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/media-craft-ai/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18813"
+BASE_PATH = "/"

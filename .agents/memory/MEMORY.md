@@ -1,0 +1,1 @@
+- [MediaCraft processing fallback](mediacraft-processing.md) — keep local FFmpeg useful with visible, bounded repair attempts when managed Gemini is unavailable.

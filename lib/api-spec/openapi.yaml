@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: media
+    description: Media processing jobs
 paths:
   /healthz:
     get:
@@ -24,7 +26,104 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /media/jobs:
+    post:
+      operationId: createMediaJob
+      tags: [media]
+      summary: Create a media processing job
+      description: Uploads one media asset and starts a processing job.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/MediaJobInput"
+      responses:
+        "202":
+          description: Processing job created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MediaJob"
+        "400":
+          description: Invalid upload or processing request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /media/jobs/{jobId}:
+    get:
+      operationId: getMediaJob
+      tags: [media]
+      summary: Get a media processing job
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+      responses:
+        "200":
+          description: Media processing job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MediaJob"
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /media/jobs/{jobId}/events:
+    get:
+      operationId: streamMediaJobEvents
+      tags: [media]
+      summary: Stream job execution events
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+      responses:
+        "200":
+          description: Server-sent execution events
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /media/jobs/{jobId}/output:
+    get:
+      operationId: downloadMediaJobOutput
+      tags: [media]
+      summary: Download the completed media output
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+      responses:
+        "200":
+          description: Processed media file
+          content:
+            video/mp4:
+              schema:
+                type: string
+                format: binary
+            audio/mpeg:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Output not available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
+  parameters:
+    JobId:
+      name: jobId
+      in: path
+      required: true
+      schema:
+        type: string
   schemas:
     HealthStatus:
       type: object
@@ -33,4 +132,71 @@ components:
           type: string
       required:
         - status
+    MediaJobInput:
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
+        preset:
+          type: string
+          enum:
+            - vertical-reel
+            - extract-audio
+            - burn-subtitles
+            - compress-video
+            - custom
+        prompt:
+          type: string
+      required:
+        - file
+    MediaJob:
+      type: object
+      properties:
+        id:
+          type: string
+        filename:
+          type: string
+        status:
+          type: string
+          enum: [queued, processing, healing, succeeded, failed]
+        preset:
+          type: string
+        prompt:
+          type: string
+        outputUrl:
+          type: ["string", "null"]
+        outputFilename:
+          type: ["string", "null"]
+        outputMimeType:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: ["string", "null"]
+        attempt:
+          type: number
+        error:
+          type: ["string", "null"]
+      required:
+        - id
+        - filename
+        - status
+        - preset
+        - prompt
+        - outputUrl
+        - outputFilename
+        - outputMimeType
+        - createdAt
+        - completedAt
+        - attempt
+        - error
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
 
