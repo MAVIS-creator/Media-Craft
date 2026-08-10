@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, stat } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { logger } from "./logger";
@@ -50,7 +51,7 @@ export type MediaJob = {
 };
 
 const jobs = new Map<string, MediaJob>();
-const jobsRoot = path.join("/tmp", "mediacraft-ai");
+const jobsRoot = path.join(os.tmpdir(), "mediacraft-ai");
 const maxAttempts = 2;
 
 function timestamp(): string {

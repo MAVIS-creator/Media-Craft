@@ -1,14 +1,16 @@
 import { Router, type IRouter } from "express";
 import multer from "multer";
+import os from "node:os";
 import path from "node:path";
 import { mkdirSync } from "node:fs";
 import { createJob, getJob, getJobsRoot, inspectMediaFile, listJobs, prepareJobDirectory } from "../lib/media-processor";
 import { GetMediaJobResponse, CreateMediaJobResponse } from "@workspace/api-zod";
 
 const router: IRouter = Router();
-mkdirSync("/tmp/mediacraft-ai/incoming", { recursive: true });
+const incomingDir = path.join(os.tmpdir(), "mediacraft-ai", "incoming");
+mkdirSync(incomingDir, { recursive: true });
 const upload = multer({
-  dest: "/tmp/mediacraft-ai/incoming",
+  dest: incomingDir,
   limits: { fileSize: 4 * 1024 * 1024 * 1024 },
   fileFilter: (_req, file, callback) => {
     const supported = /\.(mp4|mov|mp3|wav|m4a|aac|flac|ogg|mxf)$/i.test(file.originalname);
