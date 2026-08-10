@@ -19,6 +19,17 @@ export type MediaPreset =
   | "compress-video"
   | "custom";
 
+export type MediaInspection = {
+  durationSeconds: number;
+  formatName: string;
+  sizeBytes: number;
+  hasVideo: boolean;
+  hasAudio: boolean;
+  videoCodec: string | null;
+  audioCodec: string | null;
+  streamCount: number;
+};
+
 export type MediaJob = {
   id: string;
   filename: string;
@@ -32,6 +43,7 @@ export type MediaJob = {
   completedAt: string | null;
   attempt: number;
   error: string | null;
+  mediaInfo: MediaInspection;
   inputPath: string;
   outputPath: string | null;
   events: string[];
@@ -91,11 +103,85 @@ export function getJob(id: string): MediaJob | undefined {
   return jobs.get(id);
 }
 
+export function listJobs(): MediaJob[] {
+  return [...jobs.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export async function inspectMediaFile(inputPath: string): Promise<MediaInspection> {
+  const result = await new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
+    const child = spawn(
+      "ffprobe",
+      [
+        "-v",
+        "error",
+        "-print_format",
+        "json",
+        "-show_format",
+        "-show_streams",
+        inputPath,
+      ],
+      { stdio: ["ignore", "pipe", "pipe"] },
+    );
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString();
+    });
+    child.on("error", (error) => resolve({ code: 1, stdout, stderr: error.message }));
+    child.on("close", (code) => resolve({ code: code ?? 1, stdout, stderr }));
+  });
+
+  if (result.code !== 0) {
+    throw new Error(`Media inspection failed: ${result.stderr.trim() || "ffprobe could not read this file."}`);
+  }
+
+  let parsed: {
+    format?: { format_name?: string; duration?: string; size?: string };
+    streams?: Array<{ codec_type?: string; codec_name?: string }>;
+  };
+  try {
+    parsed = JSON.parse(result.stdout);
+  } catch {
+    throw new Error("Media inspection failed: ffprobe returned invalid metadata.");
+  }
+
+  const streams = parsed.streams ?? [];
+  const hasVideo = streams.some((stream) => stream.codec_type === "video");
+  const hasAudio = streams.some((stream) => stream.codec_type === "audio");
+  const videoCodec = streams.find((stream) => stream.codec_type === "video")?.codec_name ?? null;
+  const audioCodec = streams.find((stream) => stream.codec_type === "audio")?.codec_name ?? null;
+  const durationSeconds = Number(parsed.format?.duration ?? 0);
+  if (streams.length === 0 || (!hasVideo && !hasAudio)) {
+    throw new Error("Media inspection failed: the file has no usable audio or video stream.");
+  }
+  if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
+    throw new Error("Media inspection failed: the file has no valid duration and may be corrupt.");
+  }
+  if ((hasVideo && !videoCodec) || (hasAudio && !audioCodec)) {
+    throw new Error("Media inspection failed: a media stream is missing its codec metadata.");
+  }
+
+  return {
+    durationSeconds,
+    formatName: parsed.format?.format_name ?? "unknown",
+    sizeBytes: Number(parsed.format?.size ?? 0),
+    hasVideo,
+    hasAudio,
+    videoCodec,
+    audioCodec,
+    streamCount: streams.length,
+  };
+}
+
 export function createJob(input: {
   filename: string;
   inputPath: string;
   preset: MediaPreset;
   prompt: string;
+  mediaInfo: MediaInspection;
 }): MediaJob {
   const id = randomUUID();
   const job: MediaJob = {
@@ -111,6 +197,7 @@ export function createJob(input: {
     completedAt: null,
     attempt: 0,
     error: null,
+    mediaInfo: input.mediaInfo,
     inputPath: input.inputPath,
     outputPath: null,
     events: [],
@@ -131,6 +218,7 @@ async function processJob(id: string): Promise<void> {
   if (!job) return;
 
   job.status = "processing";
+  event(job, `Source validated · ${job.mediaInfo.formatName} · ${job.mediaInfo.durationSeconds.toFixed(2)}s · ${job.mediaInfo.streamCount} stream(s).`);
   event(job, "Source received. Asking Gemini to plan the FFmpeg render.");
 
   const directory = path.dirname(job.inputPath);

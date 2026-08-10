@@ -27,6 +27,25 @@ paths:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
   /media/jobs:
+    get:
+      operationId: listMediaJobs
+      tags: [media]
+      summary: List media processing jobs
+      parameters:
+        - name: archive
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Media processing jobs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MediaJob"
     post:
       operationId: createMediaJob
       tags: [media]
@@ -179,6 +198,8 @@ components:
           type: number
         error:
           type: ["string", "null"]
+        mediaInfo:
+          $ref: "#/components/schemas/MediaInspection"
       required:
         - id
         - filename
@@ -192,6 +213,35 @@ components:
         - completedAt
         - attempt
         - error
+        - mediaInfo
+    MediaInspection:
+      type: object
+      properties:
+        durationSeconds:
+          type: number
+        formatName:
+          type: string
+        sizeBytes:
+          type: number
+        hasVideo:
+          type: boolean
+        hasAudio:
+          type: boolean
+        videoCodec:
+          type: ["string", "null"]
+        audioCodec:
+          type: ["string", "null"]
+        streamCount:
+          type: number
+      required:
+        - durationSeconds
+        - formatName
+        - sizeBytes
+        - hasVideo
+        - hasAudio
+        - videoCodec
+        - audioCodec
+        - streamCount
     ErrorResponse:
       type: object
       properties:

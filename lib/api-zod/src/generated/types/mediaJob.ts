@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { MediaInspection } from './mediaInspection';
 import type { MediaJobStatus } from './mediaJobStatus';
 
 export interface MediaJob {
@@ -25,4 +26,5 @@ export interface MediaJob {
   attempt: number;
   /** @nullable */
   error: string | null;
+  mediaInfo: MediaInspection;
 }

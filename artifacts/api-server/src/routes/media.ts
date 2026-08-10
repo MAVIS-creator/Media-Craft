@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import multer from "multer";
 import path from "node:path";
 import { mkdirSync } from "node:fs";
-import { createJob, getJob, getJobsRoot, prepareJobDirectory } from "../lib/media-processor";
+import { createJob, getJob, getJobsRoot, inspectMediaFile, listJobs, prepareJobDirectory } from "../lib/media-processor";
 import { GetMediaJobResponse, CreateMediaJobResponse } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -44,15 +44,34 @@ router.post("/media/jobs", upload.single("file"), async (req, res): Promise<void
   const fs = await import("node:fs/promises");
   await fs.rename(req.file.path, inputPath);
   await getJobsRoot();
+  let mediaInfo;
+  try {
+    mediaInfo = await inspectMediaFile(inputPath);
+  } catch (error) {
+    await fs.rm(directory, { recursive: true, force: true });
+    res.status(422).json({
+      error: error instanceof Error ? error.message : "Media inspection failed. Upload a valid audio or video file.",
+    });
+    return;
+  }
 
   const job = createJob({
     filename: req.file.originalname,
     inputPath,
     preset: preset as Parameters<typeof createJob>[0]["preset"],
     prompt,
+    mediaInfo,
   });
 
   res.status(202).json(CreateMediaJobResponse.parse(publicJob(job)));
+});
+
+router.get("/media/jobs", (req, res): void => {
+  const archive = req.query.archive === "true";
+  const jobs = listJobs()
+    .filter((job) => (archive ? job.status === "succeeded" || job.status === "failed" : true))
+    .map(publicJob);
+  res.json(jobs);
 });
 
 router.get("/media/jobs/:jobId", (req, res): void => {

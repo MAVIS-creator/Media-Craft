@@ -8,6 +8,8 @@
 
 export * from './errorResponse';
 export * from './healthStatus';
+export * from './listMediaJobsParams';
+export * from './mediaInspection';
 export * from './mediaJob';
 export * from './mediaJobInput';
 export * from './mediaJobInputPreset';

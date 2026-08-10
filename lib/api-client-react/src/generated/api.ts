@@ -22,6 +22,7 @@ import type {
 import type {
   ErrorResponse,
   HealthStatus,
+  ListMediaJobsParams,
   MediaJob,
   MediaJobInput
 } from './api.schemas';
@@ -119,6 +120,90 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getHealthCheckQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListMediaJobsUrl = (params?: ListMediaJobsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/media/jobs?${stringifiedParams}` : `/api/media/jobs`
+}
+
+/**
+ * @summary List media processing jobs
+ */
+export const listMediaJobs = async (params?: ListMediaJobsParams, options?: Parameters<typeof customFetch>[1]): Promise<MediaJob[]> => {
+
+  return customFetch<MediaJob[]>(getListMediaJobsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMediaJobsQueryKey = (params?: ListMediaJobsParams,) => {
+    return [
+    `/api/media/jobs`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListMediaJobsQueryOptions = <TData = Awaited<ReturnType<typeof listMediaJobs>>, TError = ErrorType<unknown>>(params?: ListMediaJobsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMediaJobs>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMediaJobsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMediaJobs>>> = ({ signal }) => listMediaJobs(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMediaJobs>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMediaJobsQueryResult = NonNullable<Awaited<ReturnType<typeof listMediaJobs>>>
+export type ListMediaJobsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List media processing jobs
+ */
+
+export function useListMediaJobs<TData = Awaited<ReturnType<typeof listMediaJobs>>, TError = ErrorType<unknown>>(
+ params?: ListMediaJobsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMediaJobs>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMediaJobsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

@@ -18,6 +18,40 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
+ * @summary List media processing jobs
+ */
+export const ListMediaJobsQueryParams = zod.object({
+  "archive": zod.coerce.boolean().optional()
+})
+
+export const ListMediaJobsResponseItem = zod.object({
+  "id": zod.string(),
+  "filename": zod.string(),
+  "status": zod.enum(['queued', 'processing', 'healing', 'succeeded', 'failed']),
+  "preset": zod.string(),
+  "prompt": zod.string(),
+  "outputUrl": zod.string().nullable(),
+  "outputFilename": zod.string().nullable(),
+  "outputMimeType": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "completedAt": zod.string().nullable(),
+  "attempt": zod.number(),
+  "error": zod.string().nullable(),
+  "mediaInfo": zod.object({
+  "durationSeconds": zod.number(),
+  "formatName": zod.string(),
+  "sizeBytes": zod.number(),
+  "hasVideo": zod.boolean(),
+  "hasAudio": zod.boolean(),
+  "videoCodec": zod.string().nullable(),
+  "audioCodec": zod.string().nullable(),
+  "streamCount": zod.number()
+})
+})
+export const ListMediaJobsResponse = zod.array(ListMediaJobsResponseItem)
+
+
+/**
  * Uploads one media asset and starts a processing job.
  * @summary Create a media processing job
  */
@@ -39,7 +73,17 @@ export const CreateMediaJobResponse = zod.object({
   "createdAt": zod.coerce.date(),
   "completedAt": zod.string().nullable(),
   "attempt": zod.number(),
-  "error": zod.string().nullable()
+  "error": zod.string().nullable(),
+  "mediaInfo": zod.object({
+  "durationSeconds": zod.number(),
+  "formatName": zod.string(),
+  "sizeBytes": zod.number(),
+  "hasVideo": zod.boolean(),
+  "hasAudio": zod.boolean(),
+  "videoCodec": zod.string().nullable(),
+  "audioCodec": zod.string().nullable(),
+  "streamCount": zod.number()
+})
 })
 
 
@@ -62,7 +106,17 @@ export const GetMediaJobResponse = zod.object({
   "createdAt": zod.coerce.date(),
   "completedAt": zod.string().nullable(),
   "attempt": zod.number(),
-  "error": zod.string().nullable()
+  "error": zod.string().nullable(),
+  "mediaInfo": zod.object({
+  "durationSeconds": zod.number(),
+  "formatName": zod.string(),
+  "sizeBytes": zod.number(),
+  "hasVideo": zod.boolean(),
+  "hasAudio": zod.boolean(),
+  "videoCodec": zod.string().nullable(),
+  "audioCodec": zod.string().nullable(),
+  "streamCount": zod.number()
+})
 })
 
 

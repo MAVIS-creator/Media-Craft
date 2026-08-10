@@ -37,6 +37,19 @@ export const MediaJobStatus = {
   failed: 'failed',
 } as const;
 
+export interface MediaInspection {
+  durationSeconds: number;
+  formatName: string;
+  sizeBytes: number;
+  hasVideo: boolean;
+  hasAudio: boolean;
+  /** @nullable */
+  videoCodec: string | null;
+  /** @nullable */
+  audioCodec: string | null;
+  streamCount: number;
+}
+
 export interface MediaJob {
   id: string;
   filename: string;
@@ -55,9 +68,14 @@ export interface MediaJob {
   attempt: number;
   /** @nullable */
   error: string | null;
+  mediaInfo: MediaInspection;
 }
 
 export interface ErrorResponse {
   error: string;
 }
+
+export type ListMediaJobsParams = {
+archive?: boolean;
+};
 
