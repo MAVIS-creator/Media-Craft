@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
+import { searchWebGrounding } from "./parallel-search";
 
 const GeminiArgsPayload = z.object({
   args: z.array(z.string()).min(3).max(80),
@@ -65,6 +66,10 @@ export async function generateFfmpegArgs(input: {
   stderr?: string;
 }): Promise<string[]> {
   const client = new GoogleGenAI({ apiKey: requireApiKey() });
+  const parallelGrounding = await searchWebGrounding(input.instruction);
+  const groundingContext = parallelGrounding.snippets.length > 0
+    ? `\n\nParallel Web Search Grounding Context:\n${parallelGrounding.snippets.join("\n")}`
+    : "";
   const repairContext = input.stderr
     ? `\n\nThe previous FFmpeg attempt failed. Rewrite the arguments using this raw stderr exactly as diagnostic context:\n---\n${input.stderr}\n---`
     : "";
@@ -77,6 +82,7 @@ Use exactly one "-i" followed by "__INPUT__". The final array item must be "__OU
 Do not include executable names, shell syntax, absolute paths, relative paths, URLs, or extra input files.
 Use conservative, widely available FFmpeg codecs and filters. Preserve audio when the instruction asks for video.
 The input filename is only context: ${input.filename}
+${groundingContext}
 
 Raw instruction:
 ${input.instruction.slice(0, 2000)}

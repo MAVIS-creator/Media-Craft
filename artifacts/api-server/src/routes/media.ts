@@ -98,6 +98,26 @@ router.get("/media/jobs/:jobId/events", (req, res): void => {
   res.send(job.events.join("\n"));
 });
 
+import { getGrafanaTelemetry } from "../lib/grafana-mcp";
+import { queryClickHouseAnalytics } from "../lib/clickhouse-mcp";
+
+router.get("/metrics/telemetry", (_req, res): void => {
+  const allJobs = listJobs();
+  const active = allJobs.filter((j) => j.status === "processing" || j.status === "healing" || j.status === "queued").length;
+  const completed = allJobs.filter((j) => j.status === "succeeded").length;
+  const failed = allJobs.filter((j) => j.status === "failed").length;
+
+  res.json(getGrafanaTelemetry({ active, completed, failed }));
+});
+
+router.get("/media/analytics", (req, res): void => {
+  const status = typeof req.query.status === "string" ? req.query.status : undefined;
+  const codec = typeof req.query.codec === "string" ? req.query.codec : undefined;
+  const preset = typeof req.query.preset === "string" ? req.query.preset : undefined;
+
+  res.json(queryClickHouseAnalytics({ status, codec, preset }));
+});
+
 router.get("/media/jobs/:jobId/output", async (req, res): Promise<void> => {
   const id = Array.isArray(req.params.jobId) ? req.params.jobId[0] : req.params.jobId;
   const job = getJob(id);

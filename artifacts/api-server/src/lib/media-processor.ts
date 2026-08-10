@@ -5,6 +5,8 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { logger } from "./logger";
 import { generateFfmpegArgs, resolveFfmpegArgs } from "./gemini-ffmpeg";
+import { recordSelfHealEvent } from "./grafana-mcp";
+import { logToClickHouse } from "./clickhouse-mcp";
 
 export type MediaJobStatus =
   | "queued"
@@ -236,6 +238,7 @@ async function processJob(id: string): Promise<void> {
     if (attempt > 1) {
       job.status = "healing";
       event(job, "GOLD · Sending raw FFmpeg stderr to Gemini for argument repair.");
+      recordSelfHealEvent(stderr);
     } else {
       job.status = "processing";
       event(job, "Gemini returned a JSON FFmpeg argument plan.");
@@ -254,6 +257,17 @@ async function processJob(id: string): Promise<void> {
       event(job, `RED · ${job.error}`);
       job.status = "failed";
       job.completedAt = new Date().toISOString();
+      logToClickHouse({
+        jobId: id,
+        filename: job.filename,
+        preset: job.preset,
+        durationSeconds: job.mediaInfo.durationSeconds,
+        videoCodec: job.mediaInfo.videoCodec,
+        audioCodec: job.mediaInfo.audioCodec,
+        status: "failed",
+        attempts: attempt,
+        timestamp: new Date().toISOString(),
+      });
       logger.warn({ jobId: id, error: job.error }, "Gemini FFmpeg planning failed");
       return;
     }
@@ -276,6 +290,17 @@ async function processJob(id: string): Promise<void> {
       job.outputMimeType = extension === ".mp3" ? "audio/mpeg" : "video/mp4";
       job.error = null;
       event(job, `GREEN · Render complete. Output verified at ${outputFilename}.`);
+      logToClickHouse({
+        jobId: id,
+        filename: job.filename,
+        preset: job.preset,
+        durationSeconds: job.mediaInfo.durationSeconds,
+        videoCodec: job.mediaInfo.videoCodec,
+        audioCodec: job.mediaInfo.audioCodec,
+        status: "succeeded",
+        attempts: attempt,
+        timestamp: new Date().toISOString(),
+      });
       logger.info({ jobId: id, attempt }, "Media job completed");
       return;
     }
@@ -287,6 +312,17 @@ async function processJob(id: string): Promise<void> {
   job.status = "failed";
   job.completedAt = new Date().toISOString();
   event(job, "Render stopped after the Gemini repair limit. The source file is untouched.");
+  logToClickHouse({
+    jobId: id,
+    filename: job.filename,
+    preset: job.preset,
+    durationSeconds: job.mediaInfo.durationSeconds,
+    videoCodec: job.mediaInfo.videoCodec,
+    audioCodec: job.mediaInfo.audioCodec,
+    status: "failed",
+    attempts: maxAttempts,
+    timestamp: new Date().toISOString(),
+  });
   logger.warn({ jobId: id, error: job.error }, "Media job failed");
 }
 
