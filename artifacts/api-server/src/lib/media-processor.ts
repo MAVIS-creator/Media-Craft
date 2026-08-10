@@ -3,6 +3,7 @@ import { mkdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { logger } from "./logger";
+import { generateFfmpegArgs, resolveFfmpegArgs } from "./gemini-ffmpeg";
 
 export type MediaJobStatus =
   | "queued"
@@ -54,131 +55,22 @@ function safeBaseName(filename: string): string {
   return base || "media";
 }
 
-function presetLabel(preset: MediaPreset): string {
-  return {
-    "vertical-reel": "vertical reel",
-    "extract-audio": "audio extraction",
-    "burn-subtitles": "caption burn-in",
-    "compress-video": "compression",
-    custom: "custom render",
-  }[preset];
-}
-
 function isAudioFile(filename: string): boolean {
   return /\.(mp3|wav|m4a|aac|flac|ogg)$/i.test(filename);
 }
 
-function createCommand(
-  job: MediaJob,
-  outputPath: string,
-  conservative = false,
-): string[] {
-  const input = job.inputPath;
-  const prompt = job.prompt.toLowerCase();
-
-  if (
-    job.preset === "extract-audio" ||
-    (job.preset === "custom" && /(audio|mp3|sound|music)/.test(prompt))
-  ) {
-    return ["-y", "-i", input, "-vn", "-c:a", "libmp3lame", outputPath];
-  }
-
-  if (
-    job.preset === "vertical-reel" ||
-    (job.preset === "custom" && /(vertical|reel|9:16|portrait)/.test(prompt))
-  ) {
-    if (isAudioFile(job.filename)) {
-      return ["-y", "-i", input, "-vn", "-c:a", "libmp3lame", outputPath];
-    }
-    const videoFilter = conservative
-      ? "scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2:black"
-      : "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black";
-    return [
-      "-y",
-      "-i",
-      input,
-      "-vf",
-      videoFilter,
-      "-c:v",
-      "libx264",
-      "-preset",
-      "veryfast",
-      "-c:a",
-      "aac",
-      "-movflags",
-      "+faststart",
-      outputPath,
-    ];
-  }
-
-  if (job.preset === "burn-subtitles") {
-    if (isAudioFile(job.filename)) {
-      return ["-y", "-i", input, "-vn", "-c:a", "libmp3lame", outputPath];
-    }
-    const fontSize = conservative ? 30 : 38;
-    return [
-      "-y",
-      "-i",
-      input,
-      "-vf",
-      `drawtext=text='MEDIACRAFT AI':fontcolor=white:fontsize=${fontSize}:box=1:boxcolor=black@0.65:boxborderw=14:x=(w-text_w)/2:y=h-(text_h*2)`,
-      "-c:v",
-      "libx264",
-      "-preset",
-      "veryfast",
-      "-c:a",
-      "aac",
-      "-movflags",
-      "+faststart",
-      outputPath,
-    ];
-  }
-
-  if (
-    job.preset === "compress-video" ||
-    (job.preset === "custom" && /(compress|smaller|size|web)/.test(prompt))
-  ) {
-    if (isAudioFile(job.filename)) {
-      return ["-y", "-i", input, "-c:a", "libmp3lame", "-b:a", "96k", outputPath];
-    }
-    return [
-      "-y",
-      "-i",
-      input,
-      "-c:v",
-      "libx264",
-      "-crf",
-      conservative ? "30" : "28",
-      "-preset",
-      "veryfast",
-      "-c:a",
-      "aac",
-      "-b:a",
-      "96k",
-      "-movflags",
-      "+faststart",
-      outputPath,
-    ];
-  }
-
-  if (isAudioFile(job.filename)) {
-    return ["-y", "-i", input, "-c:a", "libmp3lame", "-b:a", "160k", outputPath];
-  }
-
-  return [
-    "-y",
-    "-i",
-    input,
-    "-c:v",
-    "libx264",
-    "-preset",
-    "veryfast",
-    "-c:a",
-    "aac",
-    "-movflags",
-    "+faststart",
-    outputPath,
-  ];
+function presetInstruction(preset: MediaPreset): string {
+  return {
+    "vertical-reel":
+      "Convert this source into a polished 9:16 vertical reel for social media, preserving the important audio.",
+    "extract-audio":
+      "Extract the source audio as a high-quality MP3 and remove the video stream.",
+    "burn-subtitles":
+      "Burn readable subtitles into the video if subtitle data is available, preserving the source audio.",
+    "compress-video":
+      "Compress this video to a web-ready H.264 MP4 with a sensible quality/size balance.",
+    custom: "Process the source according to the editor's natural-language instruction.",
+  }[preset];
 }
 
 function runFfmpeg(args: string[]): Promise<{ code: number; stderr: string }> {
@@ -239,27 +131,47 @@ async function processJob(id: string): Promise<void> {
   if (!job) return;
 
   job.status = "processing";
-  event(job, `Source received. Preparing ${presetLabel(job.preset)}.`);
+  event(job, "Source received. Asking Gemini to plan the FFmpeg render.");
 
   const directory = path.dirname(job.inputPath);
-  const extension = isAudioFile(job.filename) || job.preset === "extract-audio" ? ".mp3" : ".mp4";
+  const extension =
+    isAudioFile(job.filename) || job.preset === "extract-audio" ? ".mp3" : ".mp4";
   const outputFilename = `${safeBaseName(job.filename)}-mediacraft${extension}`;
   const outputPath = path.join(directory, outputFilename);
   job.outputPath = outputPath;
+  const instruction = job.prompt.trim() || presetInstruction(job.preset);
+  let stderr = "";
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     job.attempt = attempt;
-    const conservative = attempt > 1;
-    if (conservative) {
+    if (attempt > 1) {
       job.status = "healing";
-      event(job, "FFmpeg returned an error. Diagnosing and rebuilding with a conservative profile.");
+      event(job, "GOLD · Sending raw FFmpeg stderr to Gemini for argument repair.");
     } else {
-      event(job, "FFmpeg render started with the selected recipe.");
+      job.status = "processing";
+      event(job, "Gemini returned a JSON FFmpeg argument plan.");
     }
 
-    const args = createCommand(job, outputPath, conservative);
-    event(job, `Render attempt ${attempt}/${maxAttempts} · ${args.slice(0, 6).join(" ")} …`);
+    let args: string[];
+    try {
+      const plannedArgs = await generateFfmpegArgs({
+        instruction,
+        filename: job.filename,
+        stderr: attempt > 1 ? stderr : undefined,
+      });
+      args = resolveFfmpegArgs(plannedArgs, job.inputPath, outputPath);
+    } catch (error) {
+      job.error = error instanceof Error ? error.message : "Gemini could not create FFmpeg arguments.";
+      event(job, `RED · ${job.error}`);
+      job.status = "failed";
+      job.completedAt = new Date().toISOString();
+      logger.warn({ jobId: id, error: job.error }, "Gemini FFmpeg planning failed");
+      return;
+    }
+
+    event(job, `Render attempt ${attempt}/${maxAttempts} · ffmpeg ${args.slice(0, 6).join(" ")} …`);
     const result = await runFfmpeg(args);
+    stderr = result.stderr;
     let outputExists = false;
     try {
       outputExists = (await stat(outputPath)).size > 0;
@@ -274,19 +186,18 @@ async function processJob(id: string): Promise<void> {
       job.outputUrl = `/api/media/jobs/${id}/output`;
       job.outputMimeType = extension === ".mp3" ? "audio/mpeg" : "video/mp4";
       job.error = null;
-      event(job, `Render complete. Output verified at ${outputFilename}.`);
+      event(job, `GREEN · Render complete. Output verified at ${outputFilename}.`);
       logger.info({ jobId: id, attempt }, "Media job completed");
       return;
     }
 
-    const diagnostic = result.stderr.trim().split("\n").slice(-3).join(" ").slice(0, 420);
-    job.error = diagnostic || "FFmpeg exited without producing a verified output.";
-    event(job, `RED · Attempt ${attempt} failed: ${job.error}`);
+    job.error = stderr.trim() || "FFmpeg exited without producing a verified output.";
+    event(job, `RED · Attempt ${attempt} failed: ${job.error.slice(-420)}`);
   }
 
   job.status = "failed";
   job.completedAt = new Date().toISOString();
-  event(job, "Render stopped after the safe retry limit. The source file is untouched.");
+  event(job, "Render stopped after the Gemini repair limit. The source file is untouched.");
   logger.warn({ jobId: id, error: job.error }, "Media job failed");
 }
 
