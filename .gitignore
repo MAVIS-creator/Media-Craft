@@ -47,3 +47,7 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Design exports
+stitch_mediacraft_ai_media_processor/
+
