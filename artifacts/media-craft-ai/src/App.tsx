@@ -228,6 +228,7 @@ function AppTour({
   const current = TOUR_STEPS[step] ?? TOUR_STEPS[0];
 
   useEffect(() => {
+    let frame = 0;
     const update = () => {
       const candidates = Array.from(document.querySelectorAll(current.target));
       const target = candidates.find((element) => {
@@ -236,15 +237,23 @@ function AppTour({
       });
       if (!target) {
         setTargetRect(null);
+        // Targets can appear one render after a view change (or after the
+        // mobile drawer finishes opening). Recheck before falling back to a
+        // centered tour card.
+        frame = requestAnimationFrame(update);
         return;
       }
       target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      requestAnimationFrame(() => setTargetRect(target.getBoundingClientRect()));
+      frame = requestAnimationFrame(() => {
+        const rect = target.getBoundingClientRect();
+        setTargetRect(rect.width > 0 && rect.height > 0 ? rect : null);
+      });
     };
     update();
     window.addEventListener('resize', update);
     window.addEventListener('scroll', update, true);
     return () => {
+      cancelAnimationFrame(frame);
       window.removeEventListener('resize', update);
       window.removeEventListener('scroll', update, true);
     };
@@ -1803,7 +1812,7 @@ function StudioApp() {
   };
 
   return (
-    <div className="grain flex min-h-[100dvh] bg-slate-950 text-slate-100 selection:bg-blue-600 selection:text-white">
+    <div className="grain studio-shell flex bg-slate-950 text-slate-100 selection:bg-blue-600 selection:text-white">
       <Sidebar
         activeView={activeView}
         onNavigate={setActiveView}
@@ -1812,7 +1821,7 @@ function StudioApp() {
         health={health.data?.status}
       />
 
-      <main className="min-w-0 flex-1 flex flex-col">
+      <main className="studio-main min-w-0 flex-1 flex flex-col">
         <Header
           health={health.data?.status}
           themeMode={themeMode}
@@ -1822,7 +1831,7 @@ function StudioApp() {
           activeJobId={jobId}
         />
 
-        <div className="page-content-shell mx-auto w-full max-w-[1400px] flex-1 px-5 py-7 sm:px-8 lg:px-10">
+        <div className="studio-content page-content-shell mx-auto w-full max-w-[1400px] flex-1 px-5 py-7 sm:px-8 lg:px-10">
           {activeView === 'live' && job ? (
             <LiveStudioView job={job} onNavigateToPresets={() => setActiveView('presets')} />
           ) : activeView === 'presets' ? (

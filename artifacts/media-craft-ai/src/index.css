@@ -88,10 +88,17 @@
 
 @layer base {
   * { @apply border-border; }
+  html, body, #root { min-height: 100%; }
   html { background: hsl(var(--background)); }
-  body { @apply font-sans antialiased bg-background text-foreground; margin: 0; }
+  body { @apply font-sans antialiased bg-background text-foreground; margin: 0; overflow: hidden; }
   button, input, textarea { font: inherit; }
 }
+
+/* The studio is an application shell, not a document page. Keep the viewport
+   fixed and let the content pane own any necessary scrolling. */
+.studio-shell { height: 100dvh; min-height: 0; overflow: hidden; }
+.studio-main { min-height: 0; overflow: hidden; }
+.studio-content { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 
 @layer utilities {
   .font-display { font-family: var(--font-display); }
