@@ -14,3 +14,9 @@ Caption transcription is a separate Gemini audio workflow: extract server-owned 
 **Why:** Temporary Gemini 503 capacity responses can interrupt a valid caption request; unlimited retries would make job duration and cost unpredictable, while unbounded SRT timing can produce captions that do not match the source.
 
 **How to apply:** Keep manual SRT/VTT burn-in distinct from generated captions, retain only a bounded retry for 429/5xx-style transcription failures, and never pass client paths to FFmpeg subtitle filters.
+
+SRT input should be canonicalized before FFmpeg: repair timestamp arrows split across lines, remove cue-number metadata from caption bodies, and emit sequential cue blocks with blank-line separators. Otherwise libass can display timestamps and all cues as visible text.
+
+**Why:** Real-world Gemini output and hand-authored files can be structurally close to SRT while violating the strict cue-header layout expected by FFmpeg/libass.
+
+**How to apply:** Validate repaired timestamps and source-duration bounds first, then write the canonical server-owned SRT used for burn-in; keep VTT validation separate because its WEBVTT header and cue rules differ.
