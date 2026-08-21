@@ -4,7 +4,8 @@ import path from "node:path";
 export type SubtitleFormat = "srt" | "vtt";
 
 const MAX_SUBTITLE_BYTES = 10 * 1024 * 1024;
-const TIMESTAMP = /(\d{2}):(\d{2}):(\d{2})[,.](\d{3})\s+-->\s+(\d{2}):(\d{2}):(\d{2})[,.](\d{3})/g;
+const TIMESTAMP = /(\d{2}):(\d{2}):(\d{2})[,.](\d{3})[ \t]+-->[ \t]+(\d{2}):(\d{2}):(\d{2})[,.](\d{3})/g;
+const TIMESTAMP_LINE = /^(\d{2}:\d{2}:\d{2}[,.]\d{3})[ \t]+-->[ \t]+(\d{2}:\d{2}:\d{2}[,.]\d{3})[ \t]*$/gm;
 
 function toMilliseconds(parts: number[]): number {
   return (((parts[0] * 60 + parts[1]) * 60 + parts[2]) * 1000) + parts[3];
@@ -19,7 +20,13 @@ function validateText(text: string, format: SubtitleFormat, sourceDurationSecond
     throw new Error("VTT subtitle files must begin with WEBVTT.");
   }
 
-  const matches = [...normalized.matchAll(TIMESTAMP)];
+  const repairedForValidation = format === "srt"
+    ? normalized.replace(
+      /(\d{2}:\d{2}:\d{2}[,.]\d{3})[ \t]*-->[ \t]*\n[ \t]*(\d{2}:\d{2}:\d{2}[,.]\d{3})/g,
+      "$1 --> $2",
+    )
+    : normalized;
+  const matches = [...repairedForValidation.matchAll(TIMESTAMP)];
   if (matches.length === 0 || matches.length > 20_000) {
     throw new Error("Subtitle file must contain between 1 and 20,000 timed captions.");
   }
@@ -42,6 +49,24 @@ function validateText(text: string, format: SubtitleFormat, sourceDurationSecond
   }
   if (sourceDurationSeconds !== undefined && latestEnd > (sourceDurationSeconds + 2) * 1000) {
     throw new Error("Generated caption timing extends beyond the inspected source duration.");
+  }
+  if (format === "srt") {
+    const repaired = repairedForValidation;
+    const cueHeaders = [...repaired.matchAll(TIMESTAMP_LINE)];
+    const cues: string[] = [];
+    cueHeaders.forEach((header, index) => {
+      const bodyStart = (header.index ?? 0) + header[0].length;
+      const bodyEnd = cueHeaders[index + 1]?.index ?? repaired.length;
+      let caption = repaired.slice(bodyStart, bodyEnd).trim();
+      // A cue number can sit between the caption and the next timestamp when
+      // the input omitted a blank line. It is metadata, not caption text.
+      caption = caption.replace(/\n\s*\d+\s*$/, "").trim();
+      if (caption) {
+        cues.push(`${cues.length + 1}\n${header[1].replace(".", ",")} --> ${header[2].replace(".", ",")}\n${caption}`);
+      }
+    });
+    if (cues.length === 0) throw new Error("SRT file contains no readable caption text.");
+    return `${cues.join("\n\n")}\n`;
   }
   return `${normalized}\n`;
 }
