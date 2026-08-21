@@ -20,3 +20,9 @@ SRT input should be canonicalized before FFmpeg: repair timestamp arrows split a
 **Why:** Real-world Gemini output and hand-authored files can be structurally close to SRT while violating the strict cue-header layout expected by FFmpeg/libass.
 
 **How to apply:** Validate repaired timestamps and source-duration bounds first, then write the canonical server-owned SRT used for burn-in; keep VTT validation separate because its WEBVTT header and cue rules differ.
+
+FFmpeg and FFprobe must be declared as explicit Replit Nix dependencies; a workspace runtime PATH can contain them during development while an autoscale deployment does not.
+
+**Why:** A deployed upload can otherwise fail at the initial inspection boundary with `spawn ffprobe ENOENT`, even when the same source works locally.
+
+**How to apply:** Keep `ffmpeg` in the project’s Nix package declaration whenever the media API invokes either binary.
