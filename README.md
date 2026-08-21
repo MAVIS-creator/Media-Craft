@@ -197,42 +197,12 @@ curl -X POST http://localhost:8080/api/media/jobs \
 
 The event stream should identify source validation, Gemini planning, Parallel grounding, FFmpeg execution, output verification, and the analytics/telemetry providers.
 
-## Google Cloud and partner runtime usage
+## Connected services
 
-- **Google Cloud:** `@google/genai` calls Gemini 2.5 Flash from the API server.
+- **Gemini:** `@google/genai` calls Gemini 2.5 Flash from the API server.
 - **Parallel:** the API calls Parallel's Search API for FFmpeg and codec grounding.
 - **ClickHouse:** completed job records are written to ClickHouse Cloud.
 - **Grafana:** completed and failed jobs are sent as Grafana annotations, with health diagnostics exposed in the UI.
-- **Replit:** the app is configured as a Replit artifact and is intended to be hosted directly on Replit.
-
-For competition submissions, confirm that the exact partner track requirements are met. In particular, the current implementation uses ClickHouse and Grafana HTTPS APIs; the official rules state that the ClickHouse track requires `mcp-clickhouse` and the Grafana track checks active use of the official Grafana Cloud MCP server. The README cannot substitute for those runtime requirements.
-
-## Hackathon submission readiness
-
-The Google Cloud Agentic Cinema rules page requires:
-
-- A hosted project URL for judging and testing.
-- A public GitHub, GitLab, or Bitbucket repository.
-- Source code, assets, and run instructions in that repository.
-- A detectable open-source license.
-- Runtime use of Google Cloud and any claimed partner services.
-- A public demonstration video hosted on YouTube or Vimeo.
-- A video no longer than three minutes, in English or with English subtitles.
-- An English written submission covering features, technologies, data sources, findings, and learnings.
-
-Current repository status:
-
-- Repository documentation: included in this README.
-- Open-source license: MIT, included in `LICENSE`.
-- Google Gemini runtime call: implemented.
-- Parallel Search runtime call: implemented and verified.
-- ClickHouse runtime write: implemented and verified, but verify MCP-track compliance before claiming the ClickHouse track.
-- Grafana runtime annotation: implemented and verified, but verify MCP-track compliance before claiming the Grafana track.
-- Hosted URL: must be added to the Devpost submission after deployment.
-- Demo video: must be recorded, uploaded publicly, and added to Devpost.
-- Eligibility, originality, unpublished status, and submission ownership: must be confirmed by the entrant.
-
-Rules reviewed: [Google Cloud Agentic Cinema Hackathon official rules](https://agentic-cinema.devpost.com/rules).
 
 ## License
 
