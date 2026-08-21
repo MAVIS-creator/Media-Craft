@@ -1668,6 +1668,8 @@ function StudioApp() {
   const [prompt, setPrompt] = useState('');
   const [jobId, setJobId] = useState('');
   const [notice, setNotice] = useState('');
+  const [tourOpen, setTourOpen] = useState(false);
+  const [tourStep, setTourStep] = useState(0);
 
   const jobQuery = useGetMediaJob(jobId, {
     query: {
@@ -1722,6 +1724,24 @@ function StudioApp() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
+
+  useEffect(() => {
+    if (window.localStorage.getItem('mediacraft-tour-completed') !== 'true') {
+      setTourOpen(true);
+    }
+  }, []);
+
+  const closeTour = () => {
+    setTourOpen(false);
+    window.localStorage.setItem('mediacraft-tour-completed', 'true');
+  };
+
+  const startTour = () => {
+    setSettingsOpen(false);
+    setActiveView('workspace');
+    setTourStep(0);
+    setTourOpen(true);
+  };
 
   const submit = () => {
     if (!file) {
@@ -1816,8 +1836,8 @@ function StudioApp() {
             />
           ) : (
             /* Workspace Dashboard View */
-            <div className="space-y-8 animate-rise">
-              <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+             <div className="space-y-8 animate-rise">
+               <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end" data-tour="workspace-intro">
                 <div>
                   <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[.18em] text-blue-400">
                     <span className="h-px w-5 bg-blue-500" />
@@ -1842,7 +1862,7 @@ function StudioApp() {
               {/* Bento Grid: Dropzone + Preset Quick Select */}
               <div className="grid gap-6 lg:grid-cols-12">
                 <div className="lg:col-span-7 space-y-4">
-                  <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-5 sm:p-6 shadow-2xl">
+                   <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-5 sm:p-6 shadow-2xl" data-tour="upload">
                     <div className="mb-4 flex items-center justify-between">
                       <div>
                         <div className="font-mono text-[9px] uppercase tracking-[.2em] text-slate-400">Input Media</div>
@@ -1892,7 +1912,7 @@ function StudioApp() {
                 </div>
 
                 <div className="lg:col-span-5 space-y-4">
-                  <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-5 sm:p-6 shadow-2xl">
+                   <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-5 sm:p-6 shadow-2xl" data-tour="presets">
                     <div className="mb-4 flex items-center justify-between">
                       <div>
                         <div className="font-mono text-[9px] uppercase tracking-[.2em] text-slate-400">Recipe Selection</div>
@@ -1988,7 +2008,8 @@ function StudioApp() {
           <section className="shrink-0 border-t border-slate-800 bg-slate-950/90 p-4 shadow-2xl backdrop-blur-md">
             <div className="mx-auto w-full max-w-[1400px] px-1 sm:px-3 lg:px-5">
               <div className="mx-auto max-w-4xl">
-              <form
+               <form
+                 data-tour="prompt"
                 onSubmit={(e) => {
                   e.preventDefault();
                   if (prompt.trim() && !file) {
@@ -2038,6 +2059,7 @@ function StudioApp() {
           themeMode={themeMode}
           onThemeChange={setThemeMode}
           onClose={() => setSettingsOpen(false)}
+          onStartTour={startTour}
         />
       )}
 
@@ -2050,6 +2072,14 @@ function StudioApp() {
             setCommandOpen(false);
             setSettingsOpen(true);
           }}
+        />
+      )}
+
+      {tourOpen && (
+        <AppTour
+          step={tourStep}
+          onStep={setTourStep}
+          onClose={closeTour}
         />
       )}
     </div>
