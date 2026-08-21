@@ -174,11 +174,88 @@
   background-color: rgba(100, 116, 139, 0.5);
 }
 
+.studio-range,
+.studio-volume {
+  appearance: none;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(to right, #60a5fa var(--range-progress, 45%), rgba(255,255,255,.22) var(--range-progress, 45%));
+  outline: none;
+  cursor: pointer;
+}
+.studio-range::-webkit-slider-thumb,
+.studio-volume::-webkit-slider-thumb {
+  appearance: none;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 5px rgba(0,0,0,.35);
+}
+.studio-range::-moz-range-thumb,
+.studio-volume::-moz-range-thumb {
+  width: 11px;
+  height: 11px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 5px rgba(0,0,0,.35);
+}
+.studio-volume { --range-progress: 100%; }
+
+/* Stitch studio light mode: normalize the dark-first utility palette into a
+   bright editorial workspace without changing individual component markup. */
+body.theme-light .grain {
+  background:
+    radial-gradient(circle at 72% 0%, rgba(219, 234, 254, .8), transparent 32rem),
+    linear-gradient(180deg, #ffffff 0%, #f8fbff 50%, #f1f5f9 100%) !important;
+  color: #0f172a !important;
+}
+body.theme-light .grain [class*="bg-slate-950"] { background-color: #f8fafc !important; }
+body.theme-light .grain [class*="bg-slate-900"] { background-color: #ffffff !important; }
+body.theme-light .grain [class*="bg-slate-800"] { background-color: #f1f5f9 !important; }
+body.theme-light .grain [class*="bg-blue-950"] { background-color: #eff6ff !important; }
+body.theme-light .grain [class*="bg-yellow-950"] { background-color: #fffbeb !important; }
+body.theme-light .grain [class*="bg-rose-950"] { background-color: #fff1f2 !important; }
+body.theme-light .grain [class*="border-slate-800"],
+body.theme-light .grain [class*="border-slate-700"] { border-color: #dbe3ef !important; }
+body.theme-light .grain [class*="border-blue-800"] { border-color: #bfdbfe !important; }
+body.theme-light .grain [class*="text-white"] { color: #0f172a !important; }
+body.theme-light .grain [class*="text-slate-100"],
+body.theme-light .grain [class*="text-slate-200"],
+body.theme-light .grain [class*="text-slate-300"] { color: #334155 !important; }
+body.theme-light .grain [class*="text-slate-400"],
+body.theme-light .grain [class*="text-slate-500"] { color: #64748b !important; }
+body.theme-light .grain input,
+body.theme-light .grain textarea,
+body.theme-light .grain select {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+body.theme-light .grain header { background-color: rgba(255, 255, 255, .92) !important; }
+body.theme-light .grain aside > div { background-color: #ffffff !important; }
+body.theme-light .grain .text-blue-300 { color: #1d4ed8 !important; }
+body.theme-light .grain .text-blue-400 { color: #2563eb !important; }
+body.theme-light .grain .text-emerald-300,
+body.theme-light .grain .text-emerald-400 { color: #047857 !important; }
+body.theme-light .grain .text-yellow-300,
+body.theme-light .grain .text-yellow-400 { color: #a16207 !important; }
+body.theme-light .grain .text-rose-400 { color: #be123c !important; }
+body.theme-light .grain .shadow-2xl,
+body.theme-light .grain .shadow-xl { box-shadow: 0 14px 32px rgba(15, 23, 42, .07) !important; }
+
+/* Player controls stay high-contrast regardless of the application theme. */
+body.theme-light .studio-player [class*="text-white"] { color: #fff !important; }
+body.theme-light .studio-player input.studio-range,
+body.theme-light .studio-player input.studio-volume {
+  background: linear-gradient(to right, #60a5fa var(--range-progress, 45%), rgba(255,255,255,.28) var(--range-progress, 45%)) !important;
+}
+body.theme-light .studio-player .bg-white { background-color: #fff !important; }
+
 body.theme-dark .grain { background: #0d1117 !important; color: #f8fafc !important; }
 body.theme-dark .grain aside,
 body.theme-dark .grain header { background: #101725 !important; border-color: #263653 !important; }
-body.theme-dark .grain section > div,
-body.theme-dark .grain label,
 body.theme-dark .grain .bg-\[\#f8f6ed\] { background: #151d2b !important; border-color: #2c3b57 !important; }
 body.theme-dark .grain .bg-\[\#eeece2\] { background: #0d1117 !important; }
 body.theme-dark .grain .text-\[\#26355f\],
@@ -191,4 +268,16 @@ body.theme-dark .grain input,
 body.theme-dark .grain textarea,
 body.theme-dark .grain select { background: #0f1724 !important; color: #f8fafc !important; border-color: #334663 !important; }
 body.theme-dark .grain .bg-\[\#f4f1e7\],
-body.theme-dark .grain .bg-\[\#ece9de\] { background: #101725 !important; }
+body.theme-dark .grain .bg-\[\#ece9de\] { background: #101725 !important; }
+
+/* Keep the page shell visually continuous; individual cards own their surfaces. */
+.page-content-shell { background: transparent !important; }
+body.theme-dark .settings-modal {
+  background: rgba(15, 23, 36, .98) !important;
+  border-color: #2c3b57 !important;
+}
+body.theme-light .settings-modal {
+  background: rgba(255, 255, 255, .98) !important;
+  border-color: #dbe3ef !important;
+}
+.settings-modal { scrollbar-color: #64748b transparent; }

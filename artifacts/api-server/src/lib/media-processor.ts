@@ -5,8 +5,9 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { logger } from "./logger";
 import { generateFfmpegArgs, resolveFfmpegArgs } from "./gemini-ffmpeg";
-import { recordSelfHealEvent } from "./grafana-mcp";
+import { recordGrafanaJobEvent, recordSelfHealEvent } from "./grafana-mcp";
 import { logToClickHouse } from "./clickhouse-mcp";
+import { getParallelStatus } from "./parallel-search";
 
 export type MediaJobStatus =
   | "queued"
@@ -241,7 +242,7 @@ async function processJob(id: string): Promise<void> {
       recordSelfHealEvent(stderr);
     } else {
       job.status = "processing";
-      event(job, "Gemini returned a JSON FFmpeg argument plan.");
+      event(job, "Gemini planning request sent. Parallel is grounding media guidance.");
     }
 
     let args: string[];
@@ -249,9 +250,12 @@ async function processJob(id: string): Promise<void> {
       const plannedArgs = await generateFfmpegArgs({
         instruction,
         filename: job.filename,
+        outputKind: extension === ".mp3" ? "audio" : "video",
         stderr: attempt > 1 ? stderr : undefined,
       });
       args = resolveFfmpegArgs(plannedArgs, job.inputPath, outputPath);
+      const parallel = getParallelStatus();
+      event(job, `Gemini returned a safe JSON FFmpeg plan · Parallel grounding: ${parallel.state}.`);
     } catch (error) {
       job.error = error instanceof Error ? error.message : "Gemini could not create FFmpeg arguments.";
       event(job, `RED · ${job.error}`);
@@ -267,6 +271,12 @@ async function processJob(id: string): Promise<void> {
         status: "failed",
         attempts: attempt,
         timestamp: new Date().toISOString(),
+      });
+      recordGrafanaJobEvent({
+        jobId: id,
+        status: "failed",
+        preset: job.preset,
+        durationSeconds: job.mediaInfo.durationSeconds,
       });
       logger.warn({ jobId: id, error: job.error }, "Gemini FFmpeg planning failed");
       return;
@@ -301,6 +311,12 @@ async function processJob(id: string): Promise<void> {
         attempts: attempt,
         timestamp: new Date().toISOString(),
       });
+      recordGrafanaJobEvent({
+        jobId: id,
+        status: "succeeded",
+        preset: job.preset,
+        durationSeconds: job.mediaInfo.durationSeconds,
+      });
       logger.info({ jobId: id, attempt }, "Media job completed");
       return;
     }
@@ -322,6 +338,12 @@ async function processJob(id: string): Promise<void> {
     status: "failed",
     attempts: maxAttempts,
     timestamp: new Date().toISOString(),
+  });
+  recordGrafanaJobEvent({
+    jobId: id,
+    status: "failed",
+    preset: job.preset,
+    durationSeconds: job.mediaInfo.durationSeconds,
   });
   logger.warn({ jobId: id, error: job.error }, "Media job failed");
 }

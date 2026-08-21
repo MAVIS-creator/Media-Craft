@@ -21,10 +21,14 @@ import type {
 
 import type {
   ErrorResponse,
+  GetMediaAnalyticsParams,
   HealthStatus,
+  IntegrationDiagnostics,
   ListMediaJobsParams,
+  MediaAnalytics,
   MediaJob,
-  MediaJobInput
+  MediaJobInput,
+  MediaTelemetry
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -515,6 +519,244 @@ export function useDownloadMediaJobOutput<TData = Awaited<ReturnType<typeof down
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getDownloadMediaJobOutputQueryOptions(jobId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetMediaTelemetryUrl = () => {
+
+
+
+
+  return `/api/metrics/telemetry`
+}
+
+/**
+ * @summary Get media processing telemetry
+ */
+export const getMediaTelemetry = async ( options?: Parameters<typeof customFetch>[1]): Promise<MediaTelemetry> => {
+
+  return customFetch<MediaTelemetry>(getGetMediaTelemetryUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMediaTelemetryQueryKey = () => {
+    return [
+    `/api/metrics/telemetry`
+    ] as const;
+    }
+
+
+export const getGetMediaTelemetryQueryOptions = <TData = Awaited<ReturnType<typeof getMediaTelemetry>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMediaTelemetry>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMediaTelemetryQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMediaTelemetry>>> = ({ signal }) => getMediaTelemetry({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMediaTelemetry>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMediaTelemetryQueryResult = NonNullable<Awaited<ReturnType<typeof getMediaTelemetry>>>
+export type GetMediaTelemetryQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get media processing telemetry
+ */
+
+export function useGetMediaTelemetry<TData = Awaited<ReturnType<typeof getMediaTelemetry>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMediaTelemetry>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMediaTelemetryQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetIntegrationDiagnosticsUrl = () => {
+
+
+
+
+  return `/api/integrations/status`
+}
+
+/**
+ * @summary Verify external media integrations
+ */
+export const getIntegrationDiagnostics = async ( options?: Parameters<typeof customFetch>[1]): Promise<IntegrationDiagnostics> => {
+
+  return customFetch<IntegrationDiagnostics>(getGetIntegrationDiagnosticsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetIntegrationDiagnosticsQueryKey = () => {
+    return [
+    `/api/integrations/status`
+    ] as const;
+    }
+
+
+export const getGetIntegrationDiagnosticsQueryOptions = <TData = Awaited<ReturnType<typeof getIntegrationDiagnostics>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getIntegrationDiagnostics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetIntegrationDiagnosticsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getIntegrationDiagnostics>>> = ({ signal }) => getIntegrationDiagnostics({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getIntegrationDiagnostics>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetIntegrationDiagnosticsQueryResult = NonNullable<Awaited<ReturnType<typeof getIntegrationDiagnostics>>>
+export type GetIntegrationDiagnosticsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Verify external media integrations
+ */
+
+export function useGetIntegrationDiagnostics<TData = Awaited<ReturnType<typeof getIntegrationDiagnostics>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getIntegrationDiagnostics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetIntegrationDiagnosticsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetMediaAnalyticsUrl = (params?: GetMediaAnalyticsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/media/analytics?${stringifiedParams}` : `/api/media/analytics`
+}
+
+/**
+ * @summary Get job analytics
+ */
+export const getMediaAnalytics = async (params?: GetMediaAnalyticsParams, options?: Parameters<typeof customFetch>[1]): Promise<MediaAnalytics> => {
+
+  return customFetch<MediaAnalytics>(getGetMediaAnalyticsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMediaAnalyticsQueryKey = (params?: GetMediaAnalyticsParams,) => {
+    return [
+    `/api/media/analytics`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetMediaAnalyticsQueryOptions = <TData = Awaited<ReturnType<typeof getMediaAnalytics>>, TError = ErrorType<unknown>>(params?: GetMediaAnalyticsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMediaAnalytics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMediaAnalyticsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMediaAnalytics>>> = ({ signal }) => getMediaAnalytics(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMediaAnalytics>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMediaAnalyticsQueryResult = NonNullable<Awaited<ReturnType<typeof getMediaAnalytics>>>
+export type GetMediaAnalyticsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get job analytics
+ */
+
+export function useGetMediaAnalytics<TData = Awaited<ReturnType<typeof getMediaAnalytics>>, TError = ErrorType<unknown>>(
+ params?: GetMediaAnalyticsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMediaAnalytics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMediaAnalyticsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

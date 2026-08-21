@@ -7,10 +7,18 @@
  */
 
 export * from './errorResponse';
+export * from './getMediaAnalyticsParams';
 export * from './healthStatus';
+export * from './integrationDiagnostics';
+export * from './integrationProviderStatus';
+export * from './integrationProviderStatusProvider';
+export * from './integrationProviderStatusState';
 export * from './listMediaJobsParams';
+export * from './mediaAnalytics';
+export * from './mediaAnalyticsRecord';
 export * from './mediaInspection';
 export * from './mediaJob';
 export * from './mediaJobInput';
 export * from './mediaJobInputPreset';
 export * from './mediaJobStatus';
+export * from './mediaTelemetry';

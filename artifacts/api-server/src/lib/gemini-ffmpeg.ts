@@ -9,6 +9,7 @@ const GeminiArgsPayload = z.object({
 const forbiddenToken = /[\u0000\r\n;|&$<>`]/;
 const inputPlaceholder = "__INPUT__";
 const outputPlaceholder = "__OUTPUT__";
+type OutputKind = "audio" | "video";
 
 function requireApiKey(): string {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -20,7 +21,7 @@ function requireApiKey(): string {
   return apiKey;
 }
 
-function parseResponse(text: string | undefined): string[] {
+function parseResponse(text: string | undefined, outputKind: OutputKind): string[] {
   if (!text) {
     throw new Error("Gemini returned an empty FFmpeg argument payload.");
   }
@@ -57,12 +58,24 @@ function parseResponse(text: string | undefined): string[] {
     throw new Error("Gemini returned an unsafe FFmpeg argument.");
   }
 
+  if (outputKind === "audio") {
+    const videoFlags = new Set(["-vf", "-filter:v", "-filter_complex", "-c:v", "-map:v"]);
+    if (args.some((arg) => videoFlags.has(arg))) {
+      throw new Error("Gemini returned video processing arguments for an audio-only output.");
+    }
+    const visualFilters = /\b(atadenoise|scale|crop|fps|subtitles|overlay|drawtext|hue|eq|setpts)\b/i;
+    if (args.some((arg) => visualFilters.test(arg))) {
+      throw new Error("Gemini returned a visual filter for an audio-only output.");
+    }
+  }
+
   return args;
 }
 
 export async function generateFfmpegArgs(input: {
   instruction: string;
   filename: string;
+  outputKind: OutputKind;
   stderr?: string;
 }): Promise<string[]> {
   const client = new GoogleGenAI({ apiKey: requireApiKey() });
@@ -82,6 +95,10 @@ Use exactly one "-i" followed by "__INPUT__". The final array item must be "__OU
 Do not include executable names, shell syntax, absolute paths, relative paths, URLs, or extra input files.
 Use conservative, widely available FFmpeg codecs and filters. Preserve audio when the instruction asks for video.
 The input filename is only context: ${input.filename}
+Target output kind: ${input.outputKind}.
+${input.outputKind === "audio"
+  ? "This is an audio-only output. Include -vn and map only the first audio stream. Never use video stream flags, visual filters, or filter_complex. If filtering audio, use only an audio filter via -filter:a."
+  : "This is a video output. Use video and audio stream mappings appropriate to the request."}
 ${groundingContext}
 
 Raw instruction:
@@ -97,7 +114,7 @@ ${repairContext}`;
     },
   });
 
-  return parseResponse(response.text);
+  return parseResponse(response.text, input.outputKind);
 }
 
 export function resolveFfmpegArgs(

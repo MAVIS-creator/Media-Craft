@@ -1,0 +1,22 @@
+<svg width="720" height="180" viewBox="0 0 720 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="mark" x1="18" y1="16" x2="150" y2="164" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2563EB"/>
+      <stop offset=".58" stop-color="#4F46E5"/>
+      <stop offset="1" stop-color="#F4B728"/>
+    </linearGradient>
+    <linearGradient id="word" x1="214" y1="42" x2="650" y2="138" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0F172A"/>
+      <stop offset=".72" stop-color="#334155"/>
+      <stop offset="1" stop-color="#2563EB"/>
+    </linearGradient>
+  </defs>
+  <rect x="12" y="12" width="156" height="156" rx="42" fill="url(#mark)"/>
+  <path d="M45 62h90v70H45V62Z" fill="#0B1220" fill-opacity=".93"/>
+  <path d="M45 62h90v21H45V62Z" fill="#111C31"/>
+  <path d="m52 54 13-18 20 14-13 18L52 54Zm34-9 12-18 20 14-13 18L86 45Zm33 5 12-18 20 14-13 18-19-14Z" fill="#F8FAFC"/>
+  <path d="m83 91 29 18-29 18V91Z" fill="#F8FAFC"/>
+  <circle cx="130" cy="126" r="4" fill="#F4B728"/>
+  <text x="208" y="82" fill="url(#word)" font-family="Arial, Helvetica, sans-serif" font-size="48" font-weight="800" letter-spacing="-1.8">MediaCraft</text>
+  <text x="210" y="126" fill="#2563EB" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700" letter-spacing="6">AI STUDIO</text>
+</svg>

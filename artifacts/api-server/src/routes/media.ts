@@ -99,7 +99,9 @@ router.get("/media/jobs/:jobId/events", (req, res): void => {
 });
 
 import { getGrafanaTelemetry } from "../lib/grafana-mcp";
-import { queryClickHouseAnalytics } from "../lib/clickhouse-mcp";
+import { probeGrafana } from "../lib/grafana-mcp";
+import { probeClickHouse, queryClickHouseAnalytics } from "../lib/clickhouse-mcp";
+import { probeParallel } from "../lib/parallel-search";
 
 router.get("/metrics/telemetry", (_req, res): void => {
   const allJobs = listJobs();
@@ -108,6 +110,14 @@ router.get("/metrics/telemetry", (_req, res): void => {
   const failed = allJobs.filter((j) => j.status === "failed").length;
 
   res.json(getGrafanaTelemetry({ active, completed, failed }));
+});
+
+router.get("/integrations/status", async (_req, res): Promise<void> => {
+  const providers = await Promise.all([probeParallel(), probeClickHouse(), probeGrafana()]);
+  res.json({
+    checkedAt: new Date().toISOString(),
+    providers,
+  });
 });
 
 router.get("/media/analytics", (req, res): void => {

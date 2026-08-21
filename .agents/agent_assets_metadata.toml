@@ -1,0 +1,16 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "e82oVZD1HGnzlwSTBqUqy"
+uri = "file://artifacts/media-craft-ai/public/logo.svg"
+type = "image"
+title = "MediaCraft AI logo"
+description = "Editable SVG wordmark and cinematic play-frame mark used by the app."
+logical_id = "6d9f9898-e2d3-46e2-a2df-6f8ce016f42b"
+content_hash = "sha256:d6050d7d1378f3a3b6700ae1118720afedc9cd566fb8a15a03bb450f58ed857d"
+size = 1344
+mtime_ms = 1787314767758
+storage_uri = "gcs://replit-rams-assets-picard/rams/assets/repl:a67fe3ca-efc3-43be-a699-2c9fe813f0ed/6d9f9898-e2d3-46e2-a2df-6f8ce016f42b/7093de2e-25bb-46c7-8df9-f81e06a199e1"
+storage_version_token = "1787314818948267"
+content_type = "image/svg+xml"

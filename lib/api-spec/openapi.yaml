@@ -135,6 +135,55 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /metrics/telemetry:
+    get:
+      operationId: getMediaTelemetry
+      tags: [media]
+      summary: Get media processing telemetry
+      responses:
+        "200":
+          description: Current processing telemetry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MediaTelemetry"
+  /integrations/status:
+    get:
+      operationId: getIntegrationDiagnostics
+      tags: [media]
+      summary: Verify external media integrations
+      responses:
+        "200":
+          description: Sanitized provider connection diagnostics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntegrationDiagnostics"
+  /media/analytics:
+    get:
+      operationId: getMediaAnalytics
+      tags: [media]
+      summary: Get job analytics
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: codec
+          in: query
+          schema:
+            type: string
+        - name: preset
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Media job analytics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MediaAnalytics"
 components:
   parameters:
     JobId:
@@ -242,6 +291,117 @@ components:
         - videoCodec
         - audioCodec
         - streamCount
+    MediaTelemetry:
+      type: object
+      properties:
+        activeJobs:
+          type: number
+        completedJobs:
+          type: number
+        failedJobs:
+          type: number
+        selfHealAttempts:
+          type: number
+        totalTokensUsed:
+          type: number
+        lastFfmpegError:
+          type: string
+        grafanaMcpConnected:
+          type: boolean
+        endpoint:
+          type: string
+      required:
+        - activeJobs
+        - completedJobs
+        - failedJobs
+        - selfHealAttempts
+        - totalTokensUsed
+        - grafanaMcpConnected
+        - endpoint
+    IntegrationProviderStatus:
+      type: object
+      properties:
+        provider:
+          type: string
+          enum: [parallel, clickhouse, grafana]
+        state:
+          type: string
+          enum: [connected, not_configured, error]
+        lastCheckedAt:
+          type: ["string", "null"]
+          format: date-time
+        lastSuccessAt:
+          type: ["string", "null"]
+          format: date-time
+        lastError:
+          type: string
+        lastWriteAt:
+          type: ["string", "null"]
+          format: date-time
+      required:
+        - provider
+        - state
+        - lastCheckedAt
+        - lastSuccessAt
+    IntegrationDiagnostics:
+      type: object
+      properties:
+        checkedAt:
+          type: string
+          format: date-time
+        providers:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntegrationProviderStatus"
+      required:
+        - checkedAt
+        - providers
+    MediaAnalyticsRecord:
+      type: object
+      properties:
+        jobId:
+          type: string
+        filename:
+          type: string
+        preset:
+          type: string
+        durationSeconds:
+          type: number
+        videoCodec:
+          type: ["string", "null"]
+        audioCodec:
+          type: ["string", "null"]
+        status:
+          type: string
+        attempts:
+          type: number
+        timestamp:
+          type: string
+      required:
+        - jobId
+        - filename
+        - preset
+        - durationSeconds
+        - videoCodec
+        - audioCodec
+        - status
+        - attempts
+        - timestamp
+    MediaAnalytics:
+      type: object
+      properties:
+        totalRecords:
+          type: number
+        clickhouseMcpConnected:
+          type: boolean
+        records:
+          type: array
+          items:
+            $ref: "#/components/schemas/MediaAnalyticsRecord"
+      required:
+        - totalRecords
+        - clickhouseMcpConnected
+        - records
     ErrorResponse:
       type: object
       properties:

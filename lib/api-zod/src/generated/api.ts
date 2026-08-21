@@ -140,3 +140,60 @@ export const DownloadMediaJobOutputParams = zod.object({
 export const DownloadMediaJobOutputResponse = zod.unknown()
 
 
+/**
+ * @summary Get media processing telemetry
+ */
+export const GetMediaTelemetryResponse = zod.object({
+  "activeJobs": zod.number(),
+  "completedJobs": zod.number(),
+  "failedJobs": zod.number(),
+  "selfHealAttempts": zod.number(),
+  "totalTokensUsed": zod.number(),
+  "lastFfmpegError": zod.string().optional(),
+  "grafanaMcpConnected": zod.boolean(),
+  "endpoint": zod.string()
+})
+
+
+/**
+ * @summary Verify external media integrations
+ */
+export const GetIntegrationDiagnosticsResponse = zod.object({
+  "checkedAt": zod.coerce.date(),
+  "providers": zod.array(zod.object({
+  "provider": zod.enum(['parallel', 'clickhouse', 'grafana']),
+  "state": zod.enum(['connected', 'not_configured', 'error']),
+  "lastCheckedAt": zod.coerce.date().nullable(),
+  "lastSuccessAt": zod.coerce.date().nullable(),
+  "lastError": zod.string().optional(),
+  "lastWriteAt": zod.coerce.date().nullish()
+}))
+})
+
+
+/**
+ * @summary Get job analytics
+ */
+export const GetMediaAnalyticsQueryParams = zod.object({
+  "status": zod.coerce.string().optional(),
+  "codec": zod.coerce.string().optional(),
+  "preset": zod.coerce.string().optional()
+})
+
+export const GetMediaAnalyticsResponse = zod.object({
+  "totalRecords": zod.number(),
+  "clickhouseMcpConnected": zod.boolean(),
+  "records": zod.array(zod.object({
+  "jobId": zod.string(),
+  "filename": zod.string(),
+  "preset": zod.string(),
+  "durationSeconds": zod.number(),
+  "videoCodec": zod.string().nullable(),
+  "audioCodec": zod.string().nullable(),
+  "status": zod.string(),
+  "attempts": zod.number(),
+  "timestamp": zod.string()
+}))
+})
+
+

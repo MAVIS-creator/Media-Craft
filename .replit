@@ -1,4 +1,4 @@
-modules = ["nodejs-20", "web", "bash"]
+modules = ["nodejs-24"]
 
 [deployment]
 router = "application"
@@ -21,3 +21,14 @@ timeoutMs = 20000
 
 [nix]
 channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+CLICKHOUSE_DATABASE = "default"
+CLICKHOUSE_HOST = ""
+CLICKHOUSE_URL = "https://te3tb0km3a.europe-west2.gcp.clickhouse.cloud:8443"
+CLICKHOUSE_USER = "default"
+GRAFANA_MCP_ENDPOINT = "https://mcp.grafana.com/mcp"
+GRAFANA_URL = "https://heftyparlor730.grafana.net/"
+LOG_LEVEL = "info"

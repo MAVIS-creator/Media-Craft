@@ -71,11 +71,83 @@ export interface MediaJob {
   mediaInfo: MediaInspection;
 }
 
+export interface MediaTelemetry {
+  activeJobs: number;
+  completedJobs: number;
+  failedJobs: number;
+  selfHealAttempts: number;
+  totalTokensUsed: number;
+  lastFfmpegError?: string;
+  grafanaMcpConnected: boolean;
+  endpoint: string;
+}
+
+export type IntegrationProviderStatusProvider = typeof IntegrationProviderStatusProvider[keyof typeof IntegrationProviderStatusProvider];
+
+
+export const IntegrationProviderStatusProvider = {
+  parallel: 'parallel',
+  clickhouse: 'clickhouse',
+  grafana: 'grafana',
+} as const;
+
+export type IntegrationProviderStatusState = typeof IntegrationProviderStatusState[keyof typeof IntegrationProviderStatusState];
+
+
+export const IntegrationProviderStatusState = {
+  connected: 'connected',
+  not_configured: 'not_configured',
+  error: 'error',
+} as const;
+
+export interface IntegrationProviderStatus {
+  provider: IntegrationProviderStatusProvider;
+  state: IntegrationProviderStatusState;
+  /** @nullable */
+  lastCheckedAt: string | null;
+  /** @nullable */
+  lastSuccessAt: string | null;
+  lastError?: string;
+  /** @nullable */
+  lastWriteAt?: string | null;
+}
+
+export interface IntegrationDiagnostics {
+  checkedAt: string;
+  providers: IntegrationProviderStatus[];
+}
+
+export interface MediaAnalyticsRecord {
+  jobId: string;
+  filename: string;
+  preset: string;
+  durationSeconds: number;
+  /** @nullable */
+  videoCodec: string | null;
+  /** @nullable */
+  audioCodec: string | null;
+  status: string;
+  attempts: number;
+  timestamp: string;
+}
+
+export interface MediaAnalytics {
+  totalRecords: number;
+  clickhouseMcpConnected: boolean;
+  records: MediaAnalyticsRecord[];
+}
+
 export interface ErrorResponse {
   error: string;
 }
 
 export type ListMediaJobsParams = {
 archive?: boolean;
+};
+
+export type GetMediaAnalyticsParams = {
+status?: string;
+codec?: string;
+preset?: string;
 };
 

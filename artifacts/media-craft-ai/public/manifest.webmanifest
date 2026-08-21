@@ -1,0 +1,17 @@
+{
+  "name": "MediaCraft AI Studio",
+  "short_name": "MediaCraft AI",
+  "description": "AI-powered media processing for filmmakers.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "/media-craft-mark.png",
+      "sizes": "1254x1254",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

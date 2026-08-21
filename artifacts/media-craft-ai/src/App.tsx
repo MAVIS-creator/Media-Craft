@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type CSSProperties, type DragEvent } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   AlertTriangle,
@@ -8,7 +8,6 @@ import {
   AudioLines,
   Check,
   ChevronDown,
-  Clapperboard,
   Cloud,
   Code2,
   Copy,
@@ -45,6 +44,9 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { Route, Switch, Router as WouterRouter } from 'wouter';
 import {
   getGetMediaJobQueryKey,
+  getGetMediaAnalyticsQueryKey,
+  getGetIntegrationDiagnosticsQueryKey,
+  getGetMediaTelemetryQueryKey,
   getHealthCheckQueryKey,
   getListMediaJobsQueryKey,
   MediaJobInputPreset,
@@ -52,6 +54,9 @@ import {
   type MediaJob,
   useCreateMediaJob,
   useDownloadMediaJobOutput,
+  useGetMediaAnalytics,
+  useGetIntegrationDiagnostics,
+  useGetMediaTelemetry,
   useGetMediaJob,
   useHealthCheck,
   useListMediaJobs,
@@ -64,9 +69,9 @@ type ThemeMode = 'light' | 'dark' | 'system';
 type AppView = 'workspace' | 'live' | 'presets' | 'recent' | 'archive';
 
 function readThemeMode(): ThemeMode {
-  if (typeof window === 'undefined') return 'dark';
+  if (typeof window === 'undefined') return 'light';
   const saved = window.localStorage.getItem('mediacraft-theme');
-  return saved === 'light' || saved === 'dark' || saved === 'system' ? saved : 'dark';
+  return saved === 'light' || saved === 'dark' || saved === 'system' ? saved : 'light';
 }
 
 interface PresetDefinition {
@@ -159,6 +164,29 @@ function StatusPill({ status }: { status?: string }) {
   );
 }
 
+function BrandMark({ compact = false, health }: { compact?: boolean; health?: string }) {
+  return (
+    <div className={`flex items-center ${compact ? '' : 'gap-3'}`}>
+      <img
+        src="/media-craft-mark.png"
+        alt="MediaCraft AI"
+        className="h-9 w-9 shrink-0 rounded-xl object-cover shadow-lg shadow-blue-900/25"
+      />
+      {!compact && (
+        <div>
+          <div className="font-display text-[17px] font-bold tracking-tight text-white">MediaCraft AI</div>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <span className={`h-1.5 w-1.5 rounded-full ${health === 'ok' ? 'bg-emerald-400 animate-pulse' : 'bg-yellow-400'}`} />
+            <span className="font-mono text-[8px] font-semibold uppercase tracking-[.14em] text-slate-400">
+              {health === 'ok' ? 'AI Studio · Online' : 'AI Studio · Connecting'}
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SettingsPanel({
   themeMode,
   onThemeChange,
@@ -168,9 +196,14 @@ function SettingsPanel({
   onThemeChange: (mode: ThemeMode) => void;
   onClose: () => void;
 }) {
+  const telemetry = useGetMediaTelemetry({ query: { queryKey: getGetMediaTelemetryQueryKey(), refetchInterval: 10000 } });
+  const analytics = useGetMediaAnalytics(undefined, { query: { queryKey: getGetMediaAnalyticsQueryKey(), refetchInterval: 10000 } });
+  const integrations = useGetIntegrationDiagnostics({ query: { queryKey: getGetIntegrationDiagnosticsQueryKey(), refetchInterval: 30000 } });
+  const metrics = telemetry.data;
+  const analyticsSummary = analytics.data;
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-end bg-black/60 p-4 backdrop-blur-sm"
+      className="settings-backdrop fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 p-4 backdrop-blur-sm sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-labelledby="settings-title"
@@ -178,7 +211,7 @@ function SettingsPanel({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <section className="w-full max-w-[400px] rounded-2xl border border-slate-700 bg-slate-900 p-6 text-slate-100 shadow-2xl animate-rise">
+      <section className="settings-modal my-auto max-h-[calc(100dvh-2rem)] w-full max-w-[520px] overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-5 text-slate-100 shadow-2xl animate-rise sm:p-6">
         <div className="flex items-start justify-between">
           <div>
             <div className="font-mono text-[9px] uppercase tracking-[.2em] text-blue-400">Studio Preferences</div>
@@ -222,8 +255,71 @@ function SettingsPanel({
               Telemetry & Validation
             </div>
             <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
-              FFprobe inspects stream duration and codecs. Telemetry logs gracefully in standalone mode.
+              FFprobe inspects stream duration and codecs before Gemini creates an FFmpeg plan.
             </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-xl border border-slate-700 bg-slate-800/60 p-3.5">
+              <div className="font-mono text-[9px] uppercase tracking-wider text-slate-400">Pipeline</div>
+              <div className="mt-1.5 text-[18px] font-bold text-white">
+                {metrics ? `${metrics.activeJobs} active` : 'Loading…'}
+              </div>
+              <div className="mt-1 text-[10px] text-slate-400">
+                {metrics ? `${metrics.completedJobs} complete · ${metrics.failedJobs} failed` : 'Checking endpoint'}
+              </div>
+            </div>
+            <div className="rounded-xl border border-slate-700 bg-slate-800/60 p-3.5">
+              <div className="font-mono text-[9px] uppercase tracking-wider text-slate-400">Session analytics</div>
+              <div className="mt-1.5 text-[18px] font-bold text-white">
+                {analyticsSummary ? analyticsSummary.totalRecords : '—'}
+              </div>
+              <div className="mt-1 text-[10px] text-slate-400">
+                {analyticsSummary?.clickhouseMcpConnected ? 'ClickHouse connected' : 'Session buffer active'}
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-700 bg-slate-800/60 p-3.5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="font-mono text-[9px] uppercase tracking-wider text-slate-400">Integration diagnostics</div>
+                <div className="mt-1 text-[12px] font-bold text-white">Live provider checks</div>
+              </div>
+              <button
+                onClick={() => void integrations.refetch()}
+                disabled={integrations.isFetching}
+                className="rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-[10px] font-bold text-slate-200 hover:bg-slate-700 disabled:opacity-50"
+              >
+                {integrations.isFetching ? 'Checking…' : 'Refresh'}
+              </button>
+            </div>
+            <div className="mt-3 space-y-2">
+              {integrations.data?.providers.map((provider) => {
+                const connected = provider.state === 'connected';
+                const notConfigured = provider.state === 'not_configured';
+                const tone = connected
+                  ? 'border-emerald-800 bg-emerald-950/50 text-emerald-300'
+                  : notConfigured
+                    ? 'border-slate-700 bg-slate-900 text-slate-300'
+                    : 'border-rose-800 bg-rose-950/50 text-rose-300';
+                return (
+                  <div key={provider.provider} className={`rounded-lg border px-2.5 py-2 ${tone}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono text-[10px] font-bold uppercase tracking-wider">{provider.provider}</span>
+                      <span className="text-[10px] font-semibold capitalize">{provider.state.replace('_', ' ')}</span>
+                    </div>
+                    <div className="mt-1 truncate text-[10px] opacity-80">
+                      {provider.lastError ?? (connected ? `Verified ${provider.lastSuccessAt ? new Date(provider.lastSuccessAt).toLocaleTimeString() : 'now'}` : 'Add the required configuration')}
+                    </div>
+                  </div>
+                );
+              }) ?? (
+                <div className="rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-2 text-[10px] text-slate-400">
+                  Checking provider connections…
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -341,18 +437,7 @@ function Sidebar({
     <div className="flex h-full flex-col px-4 py-5 bg-slate-950 border-r border-slate-800/80 text-slate-200">
       <div className="mb-8 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-600 to-yellow-400 text-white shadow-lg">
-            <Clapperboard size={19} strokeWidth={2.4} />
-          </div>
-          <div>
-            <div className="font-display text-[17px] font-bold tracking-tight text-white">MediaCraft AI</div>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span className={`h-1.5 w-1.5 rounded-full ${health === 'ok' ? 'bg-emerald-400 animate-pulse' : 'bg-yellow-400'}`} />
-              <span className="font-mono text-[9px] uppercase tracking-wider text-slate-400">
-                {health === 'ok' ? 'FFmpeg Engine: Online' : 'Connecting Engine'}
-              </span>
-            </div>
-          </div>
+          <BrandMark health={health} />
         </div>
         <button className="md:hidden text-slate-400" onClick={() => setMobileOpen(false)}>
           <X size={18} />
@@ -632,6 +717,171 @@ function Dropzone({
   );
 }
 
+function formatPlayerTime(value: number) {
+  if (!Number.isFinite(value)) return '00:00';
+  const minutes = Math.floor(value / 60);
+  const seconds = Math.floor(value % 60);
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+function StudioPlayer({
+  src,
+  isVideo,
+  filename,
+  format,
+}: {
+  src: string;
+  isVideo: boolean;
+  filename: string;
+  format: string;
+}) {
+  const mediaRef = useRef<HTMLMediaElement | null>(null);
+  const frameRef = useRef<HTMLDivElement | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(1);
+
+  const togglePlayback = () => {
+    const media = mediaRef.current;
+    if (!media) return;
+    if (media.paused) {
+      void media.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+    } else {
+      media.pause();
+      setPlaying(false);
+    }
+  };
+
+  const seek = (value: number) => {
+    const media = mediaRef.current;
+    if (!media) return;
+    media.currentTime = value;
+    setCurrentTime(value);
+  };
+
+  const changeVolume = (value: number) => {
+    const media = mediaRef.current;
+    if (!media) return;
+    media.volume = value;
+    setVolume(value);
+  };
+
+  const toggleFullscreen = () => {
+    if (!frameRef.current) return;
+    if (document.fullscreenElement) {
+      void document.exitFullscreen();
+    } else {
+      void frameRef.current.requestFullscreen();
+    }
+  };
+
+  return (
+    <div ref={frameRef} className="studio-player group relative h-full w-full overflow-hidden bg-[#07101f]">
+      {isVideo ? (
+        <video
+          ref={(node) => { mediaRef.current = node; }}
+          playsInline
+          preload="metadata"
+          className="h-full w-full object-contain"
+          src={src}
+          onLoadedMetadata={(event) => setDuration(event.currentTarget.duration)}
+          onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+          onEnded={() => setPlaying(false)}
+        />
+      ) : (
+        <div className="flex h-full w-full flex-col items-center justify-center bg-[radial-gradient(circle_at_50%_20%,rgba(37,99,235,.24),transparent_45%),#07101f] p-8 text-center">
+          <div className="flex h-20 w-20 items-center justify-center rounded-3xl border border-blue-400/20 bg-blue-500/10 text-blue-300 shadow-[0_0_50px_rgba(37,99,235,.18)]">
+            <AudioLines size={38} />
+          </div>
+          <div className="mt-4 font-display text-[18px] font-bold text-white">Audio Master</div>
+          <div className="mt-1 max-w-sm truncate font-mono text-[10px] uppercase tracking-[.14em] text-slate-400">{filename}</div>
+          <audio
+            ref={(node) => { mediaRef.current = node; }}
+            preload="metadata"
+            src={src}
+            onLoadedMetadata={(event) => setDuration(event.currentTarget.duration)}
+            onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
+            onPlay={() => setPlaying(true)}
+            onPause={() => setPlaying(false)}
+            onEnded={() => setPlaying(false)}
+          />
+        </div>
+      )}
+
+      <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between bg-gradient-to-b from-black/70 to-transparent px-4 pb-8 pt-3 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+        <span className="flex items-center gap-2 font-mono text-[9px] font-semibold uppercase tracking-[.18em] text-white/80">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,.9)]" />
+          Output Preview
+        </span>
+        <span className="font-mono text-[9px] uppercase tracking-wider text-white/60">{format}</span>
+      </div>
+
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/65 to-transparent px-4 pb-3 pt-12">
+        <div className="mb-2 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={togglePlayback}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-slate-950 transition-transform hover:scale-105"
+            aria-label={playing ? 'Pause output' : 'Play output'}
+          >
+            {playing ? <span className="text-[12px] font-black">Ⅱ</span> : <Play size={14} fill="currentColor" />}
+          </button>
+          <input
+            aria-label="Seek through output"
+            type="range"
+            min="0"
+            max={duration || 0}
+            step="0.01"
+            value={Math.min(currentTime, duration || 0)}
+            onChange={(event) => seek(Number(event.target.value))}
+            className="studio-range min-w-0 flex-1"
+            style={{ '--range-progress': `${duration ? (currentTime / duration) * 100 : 0}%` } as CSSProperties}
+          />
+          <span className="w-[82px] text-right font-mono text-[10px] tabular-nums text-white/80">
+            {formatPlayerTime(currentTime)} <span className="text-white/40">/</span> {formatPlayerTime(duration)}
+          </span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="max-w-[65%] truncate font-mono text-[9px] uppercase tracking-[.12em] text-white/60">
+            {isVideo ? 'Video output' : 'Audio output'} · {format}
+          </span>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => changeVolume(volume > 0 ? 0 : 1)}
+              className="rounded-lg p-1.5 text-white/75 transition-colors hover:bg-white/10 hover:text-white"
+              aria-label={volume > 0 ? 'Mute output' : 'Unmute output'}
+            >
+              {volume > 0 ? <Volume2 size={14} /> : <VolumeX size={14} />}
+            </button>
+            <input
+              aria-label="Output volume"
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={volume}
+              onChange={(event) => changeVolume(Number(event.target.value))}
+              className="studio-volume hidden w-16 sm:block"
+            />
+            <button
+              type="button"
+              onClick={toggleFullscreen}
+              className="rounded-lg p-1.5 text-white/75 transition-colors hover:bg-white/10 hover:text-white"
+              aria-label="Toggle fullscreen preview"
+            >
+              <Maximize2 size={14} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function LiveStudioView({
   job,
   onNavigateToPresets,
@@ -716,25 +966,16 @@ function LiveStudioView({
 
       <div className="grid items-start gap-6 lg:grid-cols-12">
         {/* Left Pane: Preview Canvas */}
-        <div className="lg:col-span-7 space-y-4">
+        <div className="lg:col-span-8 space-y-4">
           <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 shadow-2xl">
-            <div className="relative aspect-video w-full bg-slate-900 flex items-center justify-center overflow-hidden">
+            <div className="relative aspect-video w-full bg-slate-900 flex items-center justify-center overflow-hidden lg:aspect-[16/10]">
               {isSucceeded && job.outputUrl ? (
-                isVideo ? (
-                  <video
-                    controls
-                    playsInline
-                    preload="metadata"
-                    className="h-full w-full object-contain"
-                    src={job.outputUrl}
-                  />
-                ) : (
-                  <div className="flex flex-col items-center justify-center p-8 text-center text-slate-300">
-                    <AudioLines size={56} className="text-yellow-400 animate-pulse" />
-                    <div className="mt-4 font-display text-[16px] font-bold">Audio Master Ready</div>
-                    <audio controls className="mt-3 w-full max-w-sm" src={job.outputUrl} />
-                  </div>
-                )
+                <StudioPlayer
+                  src={job.outputUrl}
+                  isVideo={isVideo}
+                  filename={job.outputFilename ?? job.filename}
+                  format={job.mediaInfo.formatName || (isVideo ? 'MP4' : 'MP3')}
+                />
               ) : (
                 <div className="flex flex-col items-center justify-center p-8 text-center text-slate-400">
                   <div className="relative mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-800/80 border border-slate-700">
@@ -752,18 +993,27 @@ function LiveStudioView({
                 </div>
               )}
 
-              <div className="pointer-events-none absolute bottom-3 left-4 font-mono text-[10px] text-slate-400">
-                SOURCE: {job.filename} · {job.preset.toUpperCase()}
-              </div>
+              {!isSucceeded && (
+                <div className="pointer-events-none absolute left-4 top-3 rounded-md border border-white/10 bg-black/35 px-2 py-1 font-mono text-[9px] uppercase tracking-[.12em] text-white/60">
+                  RENDERING CANVAS · {job.preset}
+                </div>
+              )}
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 p-4 border-t border-slate-800/80 bg-slate-950">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-800/80 bg-slate-950 p-4">
               <div className="min-w-0">
-                <div className="truncate text-[13px] font-bold text-white">
+                <div className="flex items-center gap-2">
+                  {isSucceeded && <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,.8)]" />}
+                  <div className="truncate text-[13px] font-bold text-white">
                   {job.outputFilename ?? `${job.filename} (Processing)`}
+                  </div>
                 </div>
-                <div className="font-mono text-[10px] text-slate-400">
-                  Attempt {job.attempt} · Format: {job.mediaInfo.formatName || 'mp4'}
+                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[10px] uppercase tracking-wide text-slate-400">
+                  <span>{isSucceeded ? 'Verified master' : 'Processing output'}</span>
+                  <span className="text-slate-600">·</span>
+                  <span>{job.mediaInfo.formatName || 'mp4'}</span>
+                  <span className="text-slate-600">·</span>
+                  <span>Pass {job.attempt}</span>
                 </div>
               </div>
 
@@ -794,7 +1044,7 @@ function LiveStudioView({
         </div>
 
         {/* Right Pane: AI Diagnostics & Terminal Log */}
-        <div className="lg:col-span-5 space-y-4">
+        <div className="lg:col-span-4 space-y-4">
           {/* AI Diagnostic Logic Card */}
           <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-5 shadow-xl relative overflow-hidden">
             <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-yellow-400 via-blue-500 to-indigo-600" />
@@ -1130,9 +1380,19 @@ function StudioApp() {
 
   useEffect(() => {
     window.localStorage.setItem('mediacraft-theme', themeMode);
-    const dark = themeMode === 'dark' || themeMode === 'system';
-    document.documentElement.classList.toggle('dark', dark);
-    document.body.classList.toggle('theme-dark', dark);
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const applyTheme = () => {
+      const isDark = themeMode === 'dark' || (themeMode === 'system' && media.matches);
+      document.documentElement.classList.toggle('dark', isDark);
+      document.body.classList.toggle('theme-dark', isDark);
+      document.body.classList.toggle('theme-light', !isDark);
+    };
+    applyTheme();
+    if (themeMode === 'system') {
+      media.addEventListener('change', applyTheme);
+      return () => media.removeEventListener('change', applyTheme);
+    }
+    return undefined;
   }, [themeMode]);
 
   useEffect(() => {
@@ -1214,7 +1474,7 @@ function StudioApp() {
           activeJobId={jobId}
         />
 
-        <div className="mx-auto w-full max-w-[1400px] flex-1 px-5 py-7 sm:px-8 lg:px-10 pb-32">
+        <div className="page-content-shell mx-auto w-full max-w-[1400px] flex-1 px-5 py-7 sm:px-8 lg:px-10">
           {activeView === 'live' && job ? (
             <LiveStudioView job={job} onNavigateToPresets={() => setActiveView('presets')} />
           ) : activeView === 'presets' ? (
@@ -1239,7 +1499,7 @@ function StudioApp() {
                     Welcome back, <span className="bg-gradient-to-r from-blue-400 via-indigo-300 to-yellow-400 bg-clip-text text-transparent">Filmmaker.</span>
                   </h1>
                   <p className="mt-2 max-w-lg text-[12px] leading-relaxed text-slate-400">
-                    System resources optimal. AI planner, ClickHouse analytics, and parallel search grounding active.
+                    Gemini planning, FFprobe validation, and session analytics are ready for your next source file.
                   </p>
                 </div>
               </div>
@@ -1361,10 +1621,11 @@ function StudioApp() {
           )}
         </div>
 
-        {/* Bottom Fixed Natural Language Input Bar (from Stitch Dashboard) */}
+        {/* Workspace Natural Language Input */}
         {activeView === 'workspace' && (
-          <div className="fixed bottom-0 left-0 w-full md:pl-[250px] bg-slate-950/90 backdrop-blur-md border-t border-slate-800 z-40 p-4 shadow-2xl">
-            <div className="max-w-4xl mx-auto">
+          <section className="shrink-0 border-t border-slate-800 bg-slate-950/90 p-4 shadow-2xl backdrop-blur-md">
+            <div className="mx-auto w-full max-w-[1400px] px-1 sm:px-3 lg:px-5">
+              <div className="mx-auto max-w-4xl">
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -1404,8 +1665,9 @@ function StudioApp() {
                 <span>Powered by MediaCraft Gemini AI Engine &amp; FFmpeg 6.0</span>
                 <span>Press Enter to start</span>
               </div>
+              </div>
             </div>
-          </div>
+          </section>
         )}
       </main>
 
