@@ -42,7 +42,9 @@ router.post("/media/jobs", upload.single("file"), async (req, res): Promise<void
     : "custom";
   const prompt = typeof req.body.prompt === "string" ? req.body.prompt.slice(0, 1000) : "";
   const directory = await prepareJobDirectory(req.file.filename);
-  const inputPath = path.join(directory, req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, "-"));
+  // Never use the client-provided filename as a filesystem path. Keep it as
+  // display metadata only and store every upload under a fixed server name.
+  const inputPath = path.join(directory, "source-media");
   const fs = await import("node:fs/promises");
   await fs.rename(req.file.path, inputPath);
   await getJobsRoot();
