@@ -278,7 +278,7 @@ function AppTour({
     : { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
 
   return (
-    <div className="fixed inset-0 z-[70]" role="dialog" aria-modal="true" aria-labelledby="tour-title">
+    <div className="fixed inset-0 z-[120]" role="dialog" aria-modal="true" aria-labelledby="tour-title">
       <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-[1px]" onClick={onClose} />
       {targetRect && (
         <div
@@ -716,9 +716,14 @@ function Sidebar({
         <Menu size={18} />
       </button>
       {mobileOpen && (
-        <div className="fixed inset-0 z-50 md:hidden">
-          <button className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
-          <aside className="relative h-full w-[280px]">{content}</aside>
+        <div className="fixed inset-0 z-[100] isolate overflow-hidden md:hidden" role="dialog" aria-modal="true" aria-label="Mobile navigation">
+          <button
+            type="button"
+            aria-label="Close navigation"
+            className="absolute inset-0 z-0 cursor-default bg-black/60 backdrop-blur-sm"
+            onClick={() => setMobileOpen(false)}
+          />
+          <aside className="relative z-10 h-full w-[280px] max-w-[85vw] shadow-2xl">{content}</aside>
         </div>
       )}
     </>
