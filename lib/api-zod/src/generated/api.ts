@@ -173,6 +173,16 @@ export const DownloadMediaJobOutputResponse = zod.unknown()
 
 
 /**
+ * @summary Download generated or attached captions
+ */
+export const DownloadMediaJobSubtitlesParams = zod.object({
+  "jobId": zod.coerce.string()
+})
+
+export const DownloadMediaJobSubtitlesResponse = zod.unknown()
+
+
+/**
  * @summary Get media processing telemetry
  */
 export const GetMediaTelemetryResponse = zod.object({

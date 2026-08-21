@@ -8,3 +8,9 @@ The media pipeline uses Gemini to produce a validated JSON FFmpeg argument array
 **Why:** The requested product contract requires natural-language interpretation and stderr-driven argument repair from Gemini; silently substituting keyword matching would misrepresent that behavior.
 
 **How to apply:** Preserve JSON schema validation, server-owned input/output placeholders, argument-array execution without a shell, job-directory isolation, and the retry limit. For audio-only outputs, reject video flags and visual filters even when the model labels them as an audio filter.
+
+Caption transcription is a separate Gemini audio workflow: extract server-owned mono audio, request timed SRT, validate cue syntax and that timing fits the inspected source duration, then use that SRT for optional burn-in. Retry transient Gemini capacity failures once with a visible job stage, then fail explicitly.
+
+**Why:** Temporary Gemini 503 capacity responses can interrupt a valid caption request; unlimited retries would make job duration and cost unpredictable, while unbounded SRT timing can produce captions that do not match the source.
+
+**How to apply:** Keep manual SRT/VTT burn-in distinct from generated captions, retain only a bounded retry for 429/5xx-style transcription failures, and never pass client paths to FFmpeg subtitle filters.

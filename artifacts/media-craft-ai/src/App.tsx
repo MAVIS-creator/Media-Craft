@@ -115,10 +115,21 @@ const PRESET_CATALOG: PresetDefinition[] = [
     category: 'captions',
     categoryLabel: 'Open Captions',
     detail: 'Open captions overlay',
-    description: 'Burns embedded or auto-generated caption tracks directly into video frames with clean cinema typography.',
-    ffmpegPreview: '-vf "subtitles=source.srt:force_style=\'FontSize=22,PrimaryColour=&H00FFFFFF\'" -c:a copy',
+    description: 'Burns a supplied SRT/VTT file or captions generated from the source audio directly into video frames.',
+    ffmpegPreview: '-vf "subtitles=server-owned-captions.srt:force_style=\'FontSize=24,Outline=2\'" -c:a copy',
     icon: Mic2,
     color: 'from-rose-500 to-red-600',
+  },
+  {
+    key: 'generate-subtitles',
+    label: 'Generate Timed Captions',
+    category: 'captions',
+    categoryLabel: 'AI Captions',
+    detail: 'Source audio → validated SRT',
+    description: 'Extracts clean source audio, transcribes it with Gemini, validates the timestamps, and returns a downloadable SRT file.',
+    ffmpegPreview: 'extract mono audio → Gemini transcription → timestamp validation → captions.srt',
+    icon: Mic2,
+    color: 'from-violet-500 to-fuchsia-600',
   },
   {
     key: 'compress-video',
@@ -130,6 +141,17 @@ const PRESET_CATALOG: PresetDefinition[] = [
     ffmpegPreview: '-c:v libx264 -crf 22 -preset medium -movflags +faststart -c:a aac -b:a 192k',
     icon: Gauge,
     color: 'from-emerald-500 to-teal-600',
+  },
+  {
+    key: 'upscale-video',
+    label: 'Video Upscale 2×',
+    category: 'compression',
+    categoryLabel: 'Video Enhancement',
+    detail: '2× Lanczos upscale',
+    description: 'Doubles the frame dimensions using FFmpeg’s high-quality Lanczos scaler while preserving the source audio.',
+    ffmpegPreview: '-vf "scale=trunc(iw*2/2)*2:trunc(ih*2/2)*2:flags=lanczos" -c:v libx264 -crf 18 -c:a copy',
+    icon: Maximize2,
+    color: 'from-sky-500 to-cyan-600',
   },
   {
     key: 'custom',
@@ -717,6 +739,120 @@ function Dropzone({
   );
 }
 
+function CaptionSourcePicker({
+  subtitleFile,
+  mode,
+  onMode,
+  onFile,
+}: {
+  subtitleFile: File | null;
+  mode: 'upload' | 'generate';
+  onMode: (mode: 'upload' | 'generate') => void;
+  onFile: (file: File | null) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  return (
+    <div className="rounded-2xl border border-violet-800/70 bg-violet-950/20 p-4">
+      <div className="flex items-start gap-3">
+        <div className="rounded-xl border border-violet-700/70 bg-violet-900/40 p-2 text-violet-200">
+          <Mic2 size={17} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-[12px] font-bold text-white">Caption source</div>
+          <p className="mt-0.5 text-[10px] leading-relaxed text-slate-400">
+            Generate a timed SRT from the source audio, or burn a caption file you already have.
+          </p>
+        </div>
+      </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        <button
+          type="button"
+          onClick={() => onMode('generate')}
+          className={`rounded-xl border p-3 text-left transition-colors ${mode === 'generate' ? 'border-violet-400 bg-violet-900/50' : 'border-slate-700 bg-slate-950 hover:border-slate-600'}`}
+        >
+          <div className="flex items-center gap-2 text-[11px] font-bold text-white">
+            {mode === 'generate' && <Check size={13} className="text-violet-300" />}
+            Generate from video audio
+          </div>
+          <p className="mt-1 text-[10px] leading-relaxed text-slate-400">Extract audio, transcribe it, validate captions, then burn them.</p>
+        </button>
+        <button
+          type="button"
+          onClick={() => onMode('upload')}
+          className={`rounded-xl border p-3 text-left transition-colors ${mode === 'upload' ? 'border-violet-400 bg-violet-900/50' : 'border-slate-700 bg-slate-950 hover:border-slate-600'}`}
+        >
+          <div className="flex items-center gap-2 text-[11px] font-bold text-white">
+            {mode === 'upload' && <Check size={13} className="text-violet-300" />}
+            Upload SRT or VTT
+          </div>
+          <p className="mt-1 text-[10px] leading-relaxed text-slate-400">Burn a manually authored, UTF-8 caption sidecar into the video.</p>
+        </button>
+      </div>
+      {mode === 'upload' && (
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5">
+          <input
+            ref={inputRef}
+            className="hidden"
+            type="file"
+            accept=".srt,.vtt,text/vtt,application/x-subrip"
+            onChange={(event) => onFile(event.target.files?.[0] ?? null)}
+          />
+          <div className="min-w-0">
+            <div className="truncate text-[11px] font-semibold text-slate-200">{subtitleFile?.name ?? 'No caption file selected'}</div>
+            <div className="text-[9px] text-slate-500">UTF-8 .srt or .vtt · maximum 10 MB</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            className="shrink-0 rounded-lg border border-slate-600 bg-slate-800 px-2.5 py-1.5 text-[10px] font-bold text-slate-200 hover:bg-slate-700"
+          >
+            {subtitleFile ? 'Replace' : 'Choose file'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function WorkspaceProgressCard({ job, onOpen }: { job: MediaJob; onOpen: () => void }) {
+  const progress = Math.max(0, Math.min(100, job.progressPercent ?? 0));
+  const active = job.status !== MediaJobStatus.succeeded && job.status !== MediaJobStatus.failed;
+  const stage = (job.stage || 'queued').replaceAll('-', ' ');
+  return (
+    <section className="overflow-hidden rounded-2xl border border-blue-800/70 bg-gradient-to-r from-blue-950/70 via-slate-900 to-indigo-950/70 shadow-xl" data-testid="workspace-job-progress">
+      <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${active ? 'border-blue-600 bg-blue-900/60 text-blue-300' : job.status === MediaJobStatus.succeeded ? 'border-emerald-700 bg-emerald-950 text-emerald-300' : 'border-rose-700 bg-rose-950 text-rose-300'}`}>
+            {active ? <Loader2 size={18} className="animate-spin" /> : job.status === MediaJobStatus.succeeded ? <Check size={18} /> : <AlertTriangle size={18} />}
+          </div>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[12px] font-bold text-white">{active ? 'Active processing job' : 'Latest processing job'}</span>
+              <StatusPill status={job.status} />
+            </div>
+            <p className="mt-1 truncate text-[11px] text-slate-400">
+              {job.filename} · <span className="capitalize text-slate-300">{stage}</span>
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 sm:w-[310px]">
+          <div className="min-w-0 flex-1">
+            <div className="mb-1 flex justify-between font-mono text-[9px] uppercase tracking-wide text-blue-200">
+              <span className="truncate">{stage}</span><span>{progress}%</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-slate-800" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
+              <div className="h-full rounded-full bg-gradient-to-r from-blue-500 via-indigo-400 to-violet-400 transition-all duration-500" style={{ width: `${progress}%` }} />
+            </div>
+          </div>
+          <button onClick={onOpen} className="shrink-0 rounded-xl border border-slate-600 bg-slate-800 px-3 py-2 text-[10px] font-bold text-slate-200 hover:bg-slate-700">
+            View details
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function formatPlayerTime(value: number) {
   if (!Number.isFinite(value)) return '00:00';
   const minutes = Math.floor(value / 60);
@@ -906,6 +1042,7 @@ function LiveStudioView({
   });
 
   const isVideo = job.outputMimeType?.startsWith('video/') || job.mediaInfo.hasVideo;
+  const isCaptionOutput = job.outputMimeType === 'application/x-subrip' || job.preset === 'generate-subtitles';
   const isSucceeded = job.status === MediaJobStatus.succeeded;
   const isHealing = job.status === MediaJobStatus.healing;
   const isFailed = job.status === MediaJobStatus.failed;
@@ -964,19 +1101,39 @@ function LiveStudioView({
         </div>
       </div>
 
+      <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-3.5">
+        <div className="mb-2 flex items-center justify-between font-mono text-[10px] uppercase tracking-wider text-slate-400">
+          <span className="capitalize">{(job.stage || 'queued').replaceAll('-', ' ')}</span>
+          <span className="text-blue-300">{job.progressPercent ?? 0}%</span>
+        </div>
+        <div className="h-2 overflow-hidden rounded-full bg-slate-800" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={job.progressPercent ?? 0}>
+          <div className="h-full rounded-full bg-gradient-to-r from-blue-500 via-indigo-400 to-violet-400 transition-all duration-500" style={{ width: `${job.progressPercent ?? 0}%` }} />
+        </div>
+      </div>
+
       <div className="grid items-start gap-6 lg:grid-cols-12">
         {/* Left Pane: Preview Canvas */}
         <div className="lg:col-span-8 space-y-4">
           <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 shadow-2xl">
             <div className="relative aspect-video w-full bg-slate-900 flex items-center justify-center overflow-hidden lg:aspect-[16/10]">
-              {isSucceeded && job.outputUrl ? (
+               {isSucceeded && job.outputUrl && !isCaptionOutput ? (
                 <StudioPlayer
                   src={job.outputUrl}
                   isVideo={isVideo}
                   filename={job.outputFilename ?? job.filename}
                   format={job.mediaInfo.formatName || (isVideo ? 'MP4' : 'MP3')}
                 />
-              ) : (
+               ) : isSucceeded && isCaptionOutput ? (
+                 <div className="flex max-w-md flex-col items-center justify-center p-8 text-center text-slate-400">
+                   <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-violet-700 bg-violet-950/60">
+                     <Mic2 size={27} className="text-violet-300" />
+                   </div>
+                   <div className="font-display text-[16px] font-bold text-white">Timed Captions Ready</div>
+                   <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
+                     The source audio was transcribed into validated SRT captions. Download the file to edit or reuse it in another project.
+                   </p>
+                 </div>
+               ) : (
                 <div className="flex flex-col items-center justify-center p-8 text-center text-slate-400">
                   <div className="relative mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-800/80 border border-slate-700">
                     <Play size={26} className="text-blue-400" />
@@ -1036,6 +1193,16 @@ function LiveStudioView({
                       {output.isLoading ? <Loader2 size={14} className="animate-spin" /> : <ArrowDownToLine size={14} />}
                       Download Master
                     </button>
+                    {job.subtitleUrl && !isCaptionOutput && (
+                      <a
+                        href={job.subtitleUrl}
+                        download={job.subtitleFilename ?? 'mediacraft-captions.srt'}
+                        className="flex items-center gap-1.5 rounded-xl border border-violet-700 bg-violet-950/50 px-3 py-2 text-[11px] font-bold text-violet-200 hover:bg-violet-900/60"
+                      >
+                        <ArrowDownToLine size={13} />
+                        Captions SRT
+                      </a>
+                    )}
                   </>
                 )}
               </div>
@@ -1351,6 +1518,8 @@ function StudioApp() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const [subtitleFile, setSubtitleFile] = useState<File | null>(null);
+  const [subtitleMode, setSubtitleMode] = useState<'upload' | 'generate'>('generate');
   const [preset, setPreset] = useState<Preset>('vertical-reel');
   const [prompt, setPrompt] = useState('');
   const [jobId, setJobId] = useState('');
@@ -1415,9 +1584,22 @@ function StudioApp() {
       setNotice('Select or drop a source media file first.');
       return;
     }
+    if (preset === 'burn-subtitles' && subtitleMode === 'upload' && !subtitleFile) {
+      setNotice('Choose an SRT or VTT file, or switch to Generate from video audio.');
+      return;
+    }
     setNotice('');
     createJob.mutate(
-      { data: { file, preset, prompt: prompt.trim() || undefined } },
+      {
+        data: {
+          file,
+          preset,
+          prompt: prompt.trim() || undefined,
+          ...(preset === 'burn-subtitles'
+            ? { subtitleMode, subtitle: subtitleMode === 'upload' ? subtitleFile ?? undefined : undefined }
+            : {}),
+        },
+      },
       {
         onSuccess: (created) => {
           setJobId(created.id);
@@ -1434,6 +1616,8 @@ function StudioApp() {
 
   const reset = () => {
     setFile(null);
+    setSubtitleFile(null);
+    setSubtitleMode('generate');
     setPrompt('');
     setJobId('');
     setNotice('');
@@ -1504,6 +1688,13 @@ function StudioApp() {
                 </div>
               </div>
 
+              {job && (
+                <WorkspaceProgressCard
+                  job={job}
+                  onOpen={() => setActiveView('live')}
+                />
+              )}
+
               {/* Bento Grid: Dropzone + Preset Quick Select */}
               <div className="grid gap-6 lg:grid-cols-12">
                 <div className="lg:col-span-7 space-y-4">
@@ -1524,8 +1715,35 @@ function StudioApp() {
                         setFile(next);
                         setNotice('');
                       }}
-                      onClear={() => setFile(null)}
+                      onClear={() => {
+                        setFile(null);
+                        setSubtitleFile(null);
+                      }}
                     />
+                    {preset === 'burn-subtitles' && (
+                      <div className="mt-4">
+                        <CaptionSourcePicker
+                          subtitleFile={subtitleFile}
+                          mode={subtitleMode}
+                          onMode={(mode) => {
+                            setSubtitleMode(mode);
+                            if (mode === 'generate') setSubtitleFile(null);
+                          }}
+                          onFile={setSubtitleFile}
+                        />
+                      </div>
+                    )}
+                    {preset === 'generate-subtitles' && (
+                      <div className="mt-4 flex items-start gap-3 rounded-2xl border border-violet-800/70 bg-violet-950/20 p-4">
+                        <div className="rounded-xl border border-violet-700/70 bg-violet-900/40 p-2 text-violet-200"><Mic2 size={17} /></div>
+                        <div>
+                          <div className="text-[12px] font-bold text-white">Timed caption generation</div>
+                          <p className="mt-0.5 text-[10px] leading-relaxed text-slate-400">
+                            MediaCraft extracts the source audio, asks Gemini for a timestamped transcription, validates the SRT, and gives you a caption file to download.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1545,7 +1763,7 @@ function StudioApp() {
                     </div>
 
                     <div className="grid gap-2 sm:grid-cols-2">
-                      {PRESET_CATALOG.slice(0, 4).map((p) => {
+                      {PRESET_CATALOG.filter((item) => item.key !== 'custom').map((p) => {
                         const Icon = p.icon;
                         const active = preset === p.key;
                         return (

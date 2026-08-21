@@ -135,6 +135,31 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /media/jobs/{jobId}/subtitles:
+    get:
+      operationId: downloadMediaJobSubtitles
+      tags: [media]
+      summary: Download generated or attached captions
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+      responses:
+        "200":
+          description: Subtitle file
+          content:
+            application/x-subrip:
+              schema:
+                type: string
+                format: binary
+            text/vtt:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Captions not available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /metrics/telemetry:
     get:
       operationId: getMediaTelemetry

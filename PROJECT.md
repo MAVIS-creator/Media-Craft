@@ -11,7 +11,9 @@ It can produce:
 - MP4 video masters
 - 9:16 vertical social reels
 - Web-ready compressed H.264 video
-- Subtitle-burned video when subtitle data is available
+- Subtitle-burned video from an uploaded SRT/VTT file or captions generated from the source audio
+- Downloadable, timed SRT captions generated from source audio
+- 2× upscaled H.264 video
 - MP3 audio extracted from video
 - MP3 audio converted or transformed from supported audio sources
 - Custom video and audio edits described in natural language
@@ -20,18 +22,19 @@ It does not currently generate entirely new AI video scenes, characters, images,
 
 ## Processing pipeline
 
-1. The frontend sends one supported file and an optional preset/instruction.
+1. The frontend sends one supported file, a preset/instruction, and optionally an SRT/VTT sidecar for manual subtitle burning.
 2. Multer temporarily receives the upload.
 3. The API moves it into a server-owned temporary job directory.
 4. `ffprobe` validates the file and reads duration, format, streams, size, and codecs.
-5. Gemini 2.5 Flash converts the instruction into a JSON FFmpeg argument array.
+5. Built-in recipes use tested server-side FFmpeg argument arrays; Gemini 2.5 Flash converts Custom instructions into a validated JSON FFmpeg argument array.
 6. Parallel Search optionally supplies current technical context about codecs, formats, and FFmpeg behavior.
 7. MediaCraft validates the generated arguments and replaces its server-owned input/output placeholders.
 8. FFmpeg runs with `spawn("ffmpeg", args)`, never through a shell.
 9. MediaCraft confirms that FFmpeg exited successfully and produced a non-empty output.
 10. If FFmpeg fails, the raw stderr is sent to Gemini for one bounded repair attempt.
-11. The verified result becomes available as an MP4 or MP3 download.
-12. Job analytics are sent to ClickHouse and completion/failure annotations are sent to Grafana when configured.
+11. Caption generation extracts low-bitrate mono audio, asks Gemini for timed SRT captions, validates both syntax and source-duration bounds, and makes the SRT available for download or burn-in.
+12. The verified result becomes available as an MP4, MP3, or SRT download.
+13. Job analytics are sent to ClickHouse and completion/failure annotations are sent to Grafana when configured.
 
 The maximum is two FFmpeg attempts. The original source is not modified.
 
@@ -49,8 +52,10 @@ Available presets:
 | --- | --- |
 | `vertical-reel` | Creates a polished 9:16 social-video version |
 | `extract-audio` | Produces an MP3 and removes the video stream |
-| `burn-subtitles` | Burns available subtitle data into the video |
+| `burn-subtitles` | Burns an uploaded SRT/VTT file or generated captions into a video |
+| `generate-subtitles` | Extracts source audio, transcribes it, and returns validated timed SRT captions |
 | `compress-video` | Produces a web-ready H.264 MP4 |
+| `upscale-video` | Doubles video dimensions with a high-quality Lanczos upscale |
 | `custom` | Uses the user's natural-language instruction |
 
 ## Install and configure
@@ -162,8 +167,10 @@ The API base path is `/api`.
 | Field | Required | Description |
 | --- | --- | --- |
 | `file` | Yes | One supported video or audio file |
-| `preset` | No | `vertical-reel`, `extract-audio`, `burn-subtitles`, `compress-video`, or `custom` |
+| `preset` | No | `vertical-reel`, `extract-audio`, `burn-subtitles`, `generate-subtitles`, `compress-video`, `upscale-video`, or `custom` |
 | `prompt` | No | Natural-language instruction, limited to 1,000 characters |
+| `subtitle` | No | UTF-8 `.srt` or `.vtt` caption sidecar, accepted only for `burn-subtitles` |
+| `subtitleMode` | No | For `burn-subtitles`: `upload` for the sidecar file or `generate` to create captions from source audio before burning |
 
 ```bash
 curl -X POST http://localhost:8080/api/media/jobs \
@@ -184,6 +191,11 @@ The response includes the job ID, status, selected preset, source media inspecti
   "outputUrl": null,
   "outputFilename": null,
   "outputMimeType": null,
+  "subtitleSource": null,
+  "subtitleUrl": null,
+  "subtitleFilename": null,
+  "progressPercent": 0,
+  "stage": "queued",
   "createdAt": "2026-08-21T12:00:00.000Z",
   "completedAt": null,
   "attempt": 0,
@@ -217,7 +229,7 @@ Statuses:
 - `succeeded` — output exists and passed verification
 - `failed` — processing stopped and `error` explains why
 
-When successful, `outputUrl` points to `/api/media/jobs/JOB_ID/output`.
+When successful, `outputUrl` points to `/api/media/jobs/JOB_ID/output`. Caption jobs and generated-caption burn jobs also include `subtitleUrl`, which points to `/api/media/jobs/JOB_ID/subtitles`.
 
 ### Read processing events
 

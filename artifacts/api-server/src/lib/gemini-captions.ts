@@ -20,6 +20,7 @@ function sleep(milliseconds: number) {
 export async function generateSrtFromAudio(input: {
   audioPath: string;
   durationSeconds: number;
+  onRetry?: () => void;
 }): Promise<string> {
   const client = new GoogleGenAI({ apiKey: requireApiKey() });
   let uploadedName: string | undefined;
@@ -44,11 +45,11 @@ export async function generateSrtFromAudio(input: {
       throw new Error("Gemini did not return an audio reference for caption generation.");
     }
 
-    const response = await client.models.generateContent({
+    const request = {
       model: "gemini-2.5-flash",
       contents: [
         {
-          role: "user",
+          role: "user" as const,
           parts: [
             {
               fileData: {
@@ -72,7 +73,24 @@ Return JSON only in exactly this shape: {"srt":"1\\n00:00:00,000 --> 00:00:02,00
         responseMimeType: "application/json",
         maxOutputTokens: 8192,
       },
-    });
+    };
+
+    let response: Awaited<ReturnType<typeof client.models.generateContent>> | undefined;
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        response = await client.models.generateContent(request);
+        break;
+      } catch (error) {
+        lastError = error;
+        const message = error instanceof Error ? error.message : String(error);
+        const retryable = /\b(429|500|502|503|504)\b|unavailable|high demand|temporar/i.test(message);
+        if (!retryable || attempt === 2) break;
+        input.onRetry?.();
+        await sleep(2500);
+      }
+    }
+    if (!response) throw lastError instanceof Error ? lastError : new Error(String(lastError ?? "Gemini transcription failed."));
 
     let decoded: unknown;
     try {

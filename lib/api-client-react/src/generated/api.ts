@@ -537,6 +537,83 @@ export function useDownloadMediaJobOutput<TData = Awaited<ReturnType<typeof down
 
 
 
+export const getDownloadMediaJobSubtitlesUrl = (jobId: string,) => {
+
+
+
+
+  return `/api/media/jobs/${jobId}/subtitles`
+}
+
+/**
+ * @summary Download generated or attached captions
+ */
+export const downloadMediaJobSubtitles = async (jobId: string, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getDownloadMediaJobSubtitlesUrl(jobId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getDownloadMediaJobSubtitlesQueryKey = (jobId: string,) => {
+    return [
+    `/api/media/jobs/${jobId}/subtitles`
+    ] as const;
+    }
+
+
+export const getDownloadMediaJobSubtitlesQueryOptions = <TData = Awaited<ReturnType<typeof downloadMediaJobSubtitles>>, TError = ErrorType<ErrorResponse>>(jobId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadMediaJobSubtitles>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getDownloadMediaJobSubtitlesQueryKey(jobId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadMediaJobSubtitles>>> = ({ signal }) => downloadMediaJobSubtitles(jobId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: jobId !== null && jobId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof downloadMediaJobSubtitles>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type DownloadMediaJobSubtitlesQueryResult = NonNullable<Awaited<ReturnType<typeof downloadMediaJobSubtitles>>>
+export type DownloadMediaJobSubtitlesQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Download generated or attached captions
+ */
+
+export function useDownloadMediaJobSubtitles<TData = Awaited<ReturnType<typeof downloadMediaJobSubtitles>>, TError = ErrorType<ErrorResponse>>(
+ jobId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadMediaJobSubtitles>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getDownloadMediaJobSubtitlesQueryOptions(jobId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getGetMediaTelemetryUrl = () => {
 
 

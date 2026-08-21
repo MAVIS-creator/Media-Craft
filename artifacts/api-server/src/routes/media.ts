@@ -5,6 +5,7 @@ import path from "node:path";
 import { mkdirSync } from "node:fs";
 import { createJob, getJob, getJobsRoot, inspectMediaFile, listJobs, prepareJobDirectory } from "../lib/media-processor";
 import { GetMediaJobResponse, CreateMediaJobResponse } from "@workspace/api-zod";
+import { validateSubtitleFile } from "../lib/subtitle-utils";
 
 const router: IRouter = Router();
 const incomingDir = path.join(os.tmpdir(), "mediacraft-ai", "incoming");
@@ -13,7 +14,9 @@ const upload = multer({
   dest: incomingDir,
   limits: { fileSize: 4 * 1024 * 1024 * 1024 },
   fileFilter: (_req, file, callback) => {
-    const supported = /\.(mp4|mov|mp3|wav|m4a|aac|flac|ogg|mxf)$/i.test(file.originalname);
+    const supported = file.fieldname === "file"
+      ? /\.(mp4|mov|mp3|wav|m4a|aac|flac|ogg|mxf)$/i.test(file.originalname)
+      : file.fieldname === "subtitle" && /\.(srt|vtt)$/i.test(file.originalname);
     callback(null, supported);
   },
 });
@@ -22,17 +25,29 @@ const allowedPresets = new Set([
   "vertical-reel",
   "extract-audio",
   "burn-subtitles",
+  "generate-subtitles",
   "compress-video",
+  "upscale-video",
   "custom",
 ]);
 
 function publicJob(job: NonNullable<ReturnType<typeof getJob>>) {
-  const { inputPath: _inputPath, outputPath: _outputPath, events: _events, ...safeJob } = job;
+  const {
+    inputPath: _inputPath,
+    outputPath: _outputPath,
+    subtitlePath: _subtitlePath,
+    subtitleMode: _subtitleMode,
+    events: _events,
+    ...safeJob
+  } = job;
   return safeJob;
 }
 
-router.post("/media/jobs", upload.single("file"), async (req, res): Promise<void> => {
-  if (!req.file) {
+router.post("/media/jobs", upload.fields([{ name: "file", maxCount: 1 }, { name: "subtitle", maxCount: 1 }]), async (req, res): Promise<void> => {
+  const files = req.files as Record<string, Express.Multer.File[]> | undefined;
+  const source = files?.file?.[0];
+  const subtitle = files?.subtitle?.[0];
+  if (!source) {
     res.status(400).json({ error: "Upload a supported video or audio file." });
     return;
   }
@@ -41,12 +56,24 @@ router.post("/media/jobs", upload.single("file"), async (req, res): Promise<void
     ? req.body.preset
     : "custom";
   const prompt = typeof req.body.prompt === "string" ? req.body.prompt.slice(0, 1000) : "";
-  const directory = await prepareJobDirectory(req.file.filename);
+  const requestedSubtitleMode = req.body.subtitleMode === "generate" || req.body.subtitleMode === "upload"
+    ? req.body.subtitleMode
+    : null;
+  if (subtitle && preset !== "burn-subtitles") {
+    res.status(400).json({ error: "A subtitle file can only be used with Burn Subtitles & Captions." });
+    return;
+  }
+  if (preset === "burn-subtitles" && !subtitle && requestedSubtitleMode !== "generate") {
+    res.status(400).json({ error: "Attach an SRT/VTT caption file or choose Generate Captions from Audio." });
+    return;
+  }
+
+  const directory = await prepareJobDirectory(source.filename);
   // Never use the client-provided filename as a filesystem path. Keep it as
   // display metadata only and store every upload under a fixed server name.
   const inputPath = path.join(directory, "source-media");
   const fs = await import("node:fs/promises");
-  await fs.rename(req.file.path, inputPath);
+  await fs.rename(source.path, inputPath);
   await getJobsRoot();
   let mediaInfo;
   try {
@@ -59,12 +86,31 @@ router.post("/media/jobs", upload.single("file"), async (req, res): Promise<void
     return;
   }
 
+  let subtitlePath: string | null = null;
+  try {
+    if (subtitle) {
+      const validated = await validateSubtitleFile(subtitle.path, subtitle.originalname);
+      subtitlePath = path.join(directory, `captions.${validated.format}`);
+      await fs.writeFile(subtitlePath, validated.text, "utf8");
+      await fs.rm(subtitle.path, { force: true });
+    }
+  } catch (error) {
+    await fs.rm(directory, { recursive: true, force: true });
+    await fs.rm(subtitle?.path ?? "", { force: true }).catch(() => undefined);
+    res.status(422).json({
+      error: error instanceof Error ? error.message : "Subtitle validation failed.",
+    });
+    return;
+  }
+
   const job = createJob({
-    filename: req.file.originalname,
+    filename: source.originalname,
     inputPath,
     preset: preset as Parameters<typeof createJob>[0]["preset"],
     prompt,
     mediaInfo,
+    subtitlePath,
+    subtitleMode: subtitlePath ? "upload" : requestedSubtitleMode,
   });
 
   res.status(202).json(CreateMediaJobResponse.parse(publicJob(job)));
@@ -140,6 +186,20 @@ router.get("/media/jobs/:jobId/output", async (req, res): Promise<void> => {
   res.download(job.outputPath, job.outputFilename ?? "mediacraft-output", (error) => {
     if (error && !res.headersSent) {
       res.status(404).json({ error: "The media output could not be read." });
+    }
+  });
+});
+
+router.get("/media/jobs/:jobId/subtitles", async (req, res): Promise<void> => {
+  const id = Array.isArray(req.params.jobId) ? req.params.jobId[0] : req.params.jobId;
+  const job = getJob(id);
+  if (!job?.subtitlePath || !job.subtitleFilename) {
+    res.status(404).json({ error: "Captions are not available for this job." });
+    return;
+  }
+  res.download(job.subtitlePath, job.subtitleFilename, (error) => {
+    if (error && !res.headersSent) {
+      res.status(404).json({ error: "The subtitle file could not be read." });
     }
   });
 });
