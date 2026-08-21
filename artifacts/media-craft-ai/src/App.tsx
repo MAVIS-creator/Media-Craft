@@ -67,6 +67,7 @@ const queryClient = new QueryClient();
 type Preset = typeof MediaJobInputPreset[keyof typeof MediaJobInputPreset];
 type ThemeMode = 'light' | 'dark' | 'system';
 type AppView = 'workspace' | 'live' | 'presets' | 'recent' | 'archive';
+const brandMarkSrc = `${import.meta.env.BASE_URL}media-craft-mark.png`;
 
 function readThemeMode(): ThemeMode {
   if (typeof window === 'undefined') return 'light';
@@ -186,13 +187,141 @@ function StatusPill({ status }: { status?: string }) {
   );
 }
 
+const TOUR_STEPS = [
+  {
+    title: 'Welcome to MediaCraft AI',
+    body: 'A filmmaker-focused workspace for transforming video and audio with FFmpeg, Gemini-assisted editing, captions, and finishing tools.',
+    target: '[data-tour="workspace-intro"]',
+  },
+  {
+    title: 'Start with your source media',
+    body: 'Drop a video or audio file here. MediaCraft validates the streams with FFprobe before processing anything.',
+    target: '[data-tour="upload"]',
+  },
+  {
+    title: 'Choose a finishing recipe',
+    body: 'Use a quick preset for common jobs like captions, compression, audio extraction, and 2× upscaling—or open Custom Gemini for a natural-language edit.',
+    target: '[data-tour="presets"]',
+  },
+  {
+    title: 'Describe a custom edit',
+    body: 'Tell the AI engine what you want in plain English. It creates a safe FFmpeg plan and can repair failed renders with bounded retries.',
+    target: '[data-tour="prompt"]',
+  },
+  {
+    title: 'Follow every render',
+    body: 'The Workspace keeps your active job, stage, and progress visible. Live Processing opens the detailed event log, preview, sharing, and downloads.',
+    target: '[data-tour="navigation"]',
+  },
+] as const;
+
+function AppTour({
+  step,
+  onStep,
+  onClose,
+}: {
+  step: number;
+  onStep: (step: number) => void;
+  onClose: () => void;
+}) {
+  const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
+  const current = TOUR_STEPS[step] ?? TOUR_STEPS[0];
+
+  useEffect(() => {
+    const update = () => {
+      const candidates = Array.from(document.querySelectorAll(current.target));
+      const target = candidates.find((element) => {
+        const rect = element.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      });
+      if (!target) {
+        setTargetRect(null);
+        return;
+      }
+      target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      requestAnimationFrame(() => setTargetRect(target.getBoundingClientRect()));
+    };
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, true);
+    };
+  }, [current.target]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+      if (event.key === 'ArrowRight' && step < TOUR_STEPS.length - 1) onStep(step + 1);
+      if (event.key === 'ArrowLeft' && step > 0) onStep(step - 1);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onClose, onStep, step]);
+
+  const isLast = step === TOUR_STEPS.length - 1;
+  const cardStyle: CSSProperties = targetRect
+    ? {
+        top: Math.min(window.innerHeight - 250, Math.max(18, targetRect.bottom + 16)),
+        left: Math.min(window.innerWidth - 338, Math.max(18, targetRect.left)),
+      }
+    : { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
+
+  return (
+    <div className="fixed inset-0 z-[70]" role="dialog" aria-modal="true" aria-labelledby="tour-title">
+      <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-[1px]" onClick={onClose} />
+      {targetRect && (
+        <div
+          className="pointer-events-none fixed rounded-2xl border-2 border-blue-400 shadow-[0_0_0_9999px_rgba(2,6,23,.62),0_0_30px_rgba(96,165,250,.45)] transition-all duration-300"
+          style={{
+            top: targetRect.top - 7,
+            left: targetRect.left - 7,
+            width: targetRect.width + 14,
+            height: targetRect.height + 14,
+          }}
+        />
+      )}
+      <section
+        className="absolute w-[min(320px,calc(100vw-32px))] rounded-2xl border border-blue-500/60 bg-slate-900 p-5 text-slate-100 shadow-2xl animate-rise"
+        style={cardStyle}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="font-mono text-[9px] uppercase tracking-[.2em] text-blue-300">MediaCraft quick tour · {step + 1}/{TOUR_STEPS.length}</div>
+            <h2 id="tour-title" className="mt-1.5 font-display text-[19px] font-bold text-white">{current.title}</h2>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white" aria-label="Close tour">
+            <X size={16} />
+          </button>
+        </div>
+        <p className="mt-3 text-[12px] leading-relaxed text-slate-300">{current.body}</p>
+        <div className="mt-5 flex items-center justify-between gap-3">
+          <button onClick={onClose} className="text-[11px] font-bold text-slate-400 hover:text-white">Skip tour</button>
+          <div className="flex items-center gap-2">
+            {step > 0 && (
+              <button onClick={() => onStep(step - 1)} className="rounded-xl border border-slate-700 px-3 py-2 text-[11px] font-bold text-slate-300 hover:bg-slate-800">Back</button>
+            )}
+            <button
+              onClick={() => isLast ? onClose() : onStep(step + 1)}
+              className="rounded-xl bg-blue-600 px-4 py-2 text-[11px] font-bold text-white shadow-lg shadow-blue-950/50 hover:bg-blue-500"
+            >
+              {isLast ? 'Finish tour' : 'Next'}
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function BrandMark({ compact = false, health }: { compact?: boolean; health?: string }) {
   return (
     <div className={`flex items-center ${compact ? '' : 'gap-3'}`}>
       <img
-        src="/media-craft-mark.png"
+        src={brandMarkSrc}
         alt="MediaCraft AI"
-        className="h-9 w-9 shrink-0 rounded-xl object-cover shadow-lg shadow-blue-900/25"
+        className="h-9 w-9 min-w-9 shrink-0 rounded-xl object-contain shadow-lg shadow-blue-900/25"
       />
       {!compact && (
         <div>
@@ -213,10 +342,12 @@ function SettingsPanel({
   themeMode,
   onThemeChange,
   onClose,
+  onStartTour,
 }: {
   themeMode: ThemeMode;
   onThemeChange: (mode: ThemeMode) => void;
   onClose: () => void;
+  onStartTour: () => void;
 }) {
   const telemetry = useGetMediaTelemetry({ query: { queryKey: getGetMediaTelemetryQueryKey(), refetchInterval: 10000 } });
   const analytics = useGetMediaAnalytics(undefined, { query: { queryKey: getGetMediaAnalyticsQueryKey(), refetchInterval: 10000 } });
@@ -280,6 +411,17 @@ function SettingsPanel({
               FFprobe inspects stream duration and codecs before Gemini creates an FFmpeg plan.
             </p>
           </div>
+
+          <button
+            onClick={onStartTour}
+            className="flex w-full items-center justify-between rounded-xl border border-blue-800/70 bg-blue-950/40 p-3.5 text-left transition-colors hover:bg-blue-900/50"
+          >
+            <div>
+              <div className="text-[12px] font-bold text-white">Take the quick tour</div>
+              <div className="mt-1 text-[10px] text-slate-400">Learn what each part of the studio does.</div>
+            </div>
+            <ArrowRight size={15} className="text-blue-300" />
+          </button>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-xl border border-slate-700 bg-slate-800/60 p-3.5">
@@ -456,7 +598,7 @@ function Sidebar({
   };
 
   const content = (
-    <div className="flex h-full flex-col px-4 py-5 bg-slate-950 border-r border-slate-800/80 text-slate-200">
+    <div className="flex h-full flex-col px-4 py-5 bg-slate-950 border-r border-slate-800/80 text-slate-200" data-tour="navigation">
       <div className="mb-8 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <BrandMark health={health} />
@@ -558,6 +700,7 @@ function Sidebar({
     <>
       <aside className="hidden w-[250px] shrink-0 md:block">{content}</aside>
       <button
+        data-tour="navigation"
         className="fixed left-4 top-4 z-30 rounded-xl bg-slate-900 border border-slate-700 p-2.5 text-white shadow-lg md:hidden"
         onClick={() => setMobileOpen(true)}
       >
@@ -676,6 +819,7 @@ function Dropzone({
 
   return (
     <div
+      data-tour="upload"
       className={`relative overflow-hidden rounded-2xl border-2 border-dashed transition-all ${
         dragging
           ? 'border-blue-500 bg-blue-950/40 shadow-xl'
