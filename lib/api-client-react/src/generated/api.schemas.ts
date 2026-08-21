@@ -16,14 +16,31 @@ export const MediaJobInputPreset = {
   'vertical-reel': 'vertical-reel',
   'extract-audio': 'extract-audio',
   'burn-subtitles': 'burn-subtitles',
+  'generate-subtitles': 'generate-subtitles',
   'compress-video': 'compress-video',
+  'upscale-video': 'upscale-video',
   custom: 'custom',
+} as const;
+
+/**
+ * For burn-subtitles, upload a caption file or generate captions from the source audio.
+ */
+export type MediaJobInputSubtitleMode = typeof MediaJobInputSubtitleMode[keyof typeof MediaJobInputSubtitleMode];
+
+
+export const MediaJobInputSubtitleMode = {
+  upload: 'upload',
+  generate: 'generate',
 } as const;
 
 export interface MediaJobInput {
   file: Blob;
   preset?: MediaJobInputPreset;
   prompt?: string;
+  /** Optional SRT or VTT sidecar caption file. Required for burn-subtitles when subtitleMode is upload. */
+  subtitle?: Blob;
+  /** For burn-subtitles, upload a caption file or generate captions from the source audio. */
+  subtitleMode?: MediaJobInputSubtitleMode;
 }
 
 export type MediaJobStatus = typeof MediaJobStatus[keyof typeof MediaJobStatus];
@@ -35,6 +52,17 @@ export const MediaJobStatus = {
   healing: 'healing',
   succeeded: 'succeeded',
   failed: 'failed',
+} as const;
+
+/**
+ * @nullable
+ */
+export type MediaJobSubtitleSource = typeof MediaJobSubtitleSource[keyof typeof MediaJobSubtitleSource] | null;
+
+
+export const MediaJobSubtitleSource = {
+  uploaded: 'uploaded',
+  generated: 'generated',
 } as const;
 
 export interface MediaInspection {
@@ -62,6 +90,18 @@ export interface MediaJob {
   outputFilename: string | null;
   /** @nullable */
   outputMimeType: string | null;
+  /** @nullable */
+  subtitleSource: MediaJobSubtitleSource;
+  /** @nullable */
+  subtitleUrl: string | null;
+  /** @nullable */
+  subtitleFilename: string | null;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  progressPercent: number;
+  stage: string;
   createdAt: string;
   /** @nullable */
   completedAt: string | null;

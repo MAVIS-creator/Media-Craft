@@ -7,6 +7,7 @@
  */
 import type { MediaInspection } from './mediaInspection';
 import type { MediaJobStatus } from './mediaJobStatus';
+import type { MediaJobSubtitleSource } from './mediaJobSubtitleSource';
 
 export interface MediaJob {
   id: string;
@@ -20,6 +21,18 @@ export interface MediaJob {
   outputFilename: string | null;
   /** @nullable */
   outputMimeType: string | null;
+  /** @nullable */
+  subtitleSource: MediaJobSubtitleSource;
+  /** @nullable */
+  subtitleUrl: string | null;
+  /** @nullable */
+  subtitleFilename: string | null;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  progressPercent: number;
+  stage: string;
   createdAt: Date;
   /** @nullable */
   completedAt: string | null;

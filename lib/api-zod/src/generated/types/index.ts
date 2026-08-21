@@ -20,5 +20,7 @@ export * from './mediaInspection';
 export * from './mediaJob';
 export * from './mediaJobInput';
 export * from './mediaJobInputPreset';
+export * from './mediaJobInputSubtitleMode';
 export * from './mediaJobStatus';
+export * from './mediaJobSubtitleSource';
 export * from './mediaTelemetry';

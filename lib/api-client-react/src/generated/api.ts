@@ -241,6 +241,12 @@ if(mediaJobInput.preset !== undefined) {
 if(mediaJobInput.prompt !== undefined) {
  formData.append(`prompt`, mediaJobInput.prompt);
  }
+if(mediaJobInput.subtitle !== undefined) {
+ formData.append(`subtitle`, mediaJobInput.subtitle);
+ }
+if(mediaJobInput.subtitleMode !== undefined) {
+ formData.append(`subtitleMode`, mediaJobInput.subtitleMode);
+ }
 
   return customFetch<MediaJob>(getCreateMediaJobUrl(),
   {

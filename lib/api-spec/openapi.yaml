@@ -212,10 +212,20 @@ components:
             - vertical-reel
             - extract-audio
             - burn-subtitles
+            - generate-subtitles
             - compress-video
+            - upscale-video
             - custom
         prompt:
           type: string
+        subtitle:
+          type: string
+          format: binary
+          description: Optional SRT or VTT sidecar caption file. Required for burn-subtitles when subtitleMode is upload.
+        subtitleMode:
+          type: string
+          enum: [upload, generate]
+          description: For burn-subtitles, upload a caption file or generate captions from the source audio.
       required:
         - file
     MediaJob:
@@ -238,6 +248,19 @@ components:
           type: ["string", "null"]
         outputMimeType:
           type: ["string", "null"]
+        subtitleSource:
+          type: ["string", "null"]
+          enum: [uploaded, generated, null]
+        subtitleUrl:
+          type: ["string", "null"]
+        subtitleFilename:
+          type: ["string", "null"]
+        progressPercent:
+          type: number
+          minimum: 0
+          maximum: 100
+        stage:
+          type: string
         createdAt:
           type: string
           format: date-time
@@ -258,6 +281,11 @@ components:
         - outputUrl
         - outputFilename
         - outputMimeType
+        - subtitleSource
+        - subtitleUrl
+        - subtitleFilename
+        - progressPercent
+        - stage
         - createdAt
         - completedAt
         - attempt

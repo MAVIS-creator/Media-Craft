@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, stat } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
@@ -8,6 +8,8 @@ import { generateFfmpegArgs, resolveFfmpegArgs } from "./gemini-ffmpeg";
 import { recordGrafanaJobEvent, recordSelfHealEvent } from "./grafana-mcp";
 import { logToClickHouse } from "./clickhouse-mcp";
 import { getParallelStatus } from "./parallel-search";
+import { generateSrtFromAudio } from "./gemini-captions";
+import { validateGeneratedSrt } from "./subtitle-utils";
 
 export type MediaJobStatus =
   | "queued"
@@ -20,7 +22,9 @@ export type MediaPreset =
   | "vertical-reel"
   | "extract-audio"
   | "burn-subtitles"
+  | "generate-subtitles"
   | "compress-video"
+  | "upscale-video"
   | "custom";
 
 export type MediaInspection = {
@@ -43,14 +47,21 @@ export type MediaJob = {
   outputUrl: string | null;
   outputFilename: string | null;
   outputMimeType: string | null;
+  subtitleSource: "uploaded" | "generated" | null;
+  subtitleUrl: string | null;
+  subtitleFilename: string | null;
   createdAt: string;
   completedAt: string | null;
   attempt: number;
   error: string | null;
   mediaInfo: MediaInspection;
+  subtitlePath: string | null;
+  subtitleMode: "upload" | "generate" | null;
   inputPath: string;
   outputPath: string | null;
   events: string[];
+  progressPercent: number;
+  stage: string;
 };
 
 const jobs = new Map<string, MediaJob>();
@@ -61,7 +72,9 @@ function timestamp(): string {
   return new Date().toISOString().slice(11, 19);
 }
 
-function event(job: MediaJob, message: string): void {
+function event(job: MediaJob, message: string, progress?: number, stage?: string): void {
+  if (progress !== undefined) job.progressPercent = Math.max(0, Math.min(100, progress));
+  if (stage) job.stage = stage;
   job.events.push(`[${timestamp()}] ${message}`);
 }
 

@@ -24,6 +24,11 @@ export const ListMediaJobsQueryParams = zod.object({
   "archive": zod.coerce.boolean().optional()
 })
 
+export const listMediaJobsResponseProgressPercentMin = 0;
+export const listMediaJobsResponseProgressPercentMax = 100;
+
+
+
 export const ListMediaJobsResponseItem = zod.object({
   "id": zod.string(),
   "filename": zod.string(),
@@ -33,6 +38,11 @@ export const ListMediaJobsResponseItem = zod.object({
   "outputUrl": zod.string().nullable(),
   "outputFilename": zod.string().nullable(),
   "outputMimeType": zod.string().nullable(),
+  "subtitleSource": zod.union([zod.literal('uploaded'),zod.literal('generated'),zod.literal(null)]).nullable(),
+  "subtitleUrl": zod.string().nullable(),
+  "subtitleFilename": zod.string().nullable(),
+  "progressPercent": zod.number().min(listMediaJobsResponseProgressPercentMin).max(listMediaJobsResponseProgressPercentMax),
+  "stage": zod.string(),
   "createdAt": zod.coerce.date(),
   "completedAt": zod.string().nullable(),
   "attempt": zod.number(),
@@ -57,9 +67,16 @@ export const ListMediaJobsResponse = zod.array(ListMediaJobsResponseItem)
  */
 export const CreateMediaJobBody = zod.object({
   "file": zod.instanceof(File),
-  "preset": zod.enum(['vertical-reel', 'extract-audio', 'burn-subtitles', 'compress-video', 'custom']).optional(),
-  "prompt": zod.string().optional()
+  "preset": zod.enum(['vertical-reel', 'extract-audio', 'burn-subtitles', 'generate-subtitles', 'compress-video', 'upscale-video', 'custom']).optional(),
+  "prompt": zod.string().optional(),
+  "subtitle": zod.instanceof(File).optional().describe('Optional SRT or VTT sidecar caption file. Required for burn-subtitles when subtitleMode is upload.'),
+  "subtitleMode": zod.enum(['upload', 'generate']).optional().describe('For burn-subtitles, upload a caption file or generate captions from the source audio.')
 })
+
+export const createMediaJobResponseProgressPercentMin = 0;
+export const createMediaJobResponseProgressPercentMax = 100;
+
+
 
 export const CreateMediaJobResponse = zod.object({
   "id": zod.string(),
@@ -70,6 +87,11 @@ export const CreateMediaJobResponse = zod.object({
   "outputUrl": zod.string().nullable(),
   "outputFilename": zod.string().nullable(),
   "outputMimeType": zod.string().nullable(),
+  "subtitleSource": zod.union([zod.literal('uploaded'),zod.literal('generated'),zod.literal(null)]).nullable(),
+  "subtitleUrl": zod.string().nullable(),
+  "subtitleFilename": zod.string().nullable(),
+  "progressPercent": zod.number().min(createMediaJobResponseProgressPercentMin).max(createMediaJobResponseProgressPercentMax),
+  "stage": zod.string(),
   "createdAt": zod.coerce.date(),
   "completedAt": zod.string().nullable(),
   "attempt": zod.number(),
@@ -94,6 +116,11 @@ export const GetMediaJobParams = zod.object({
   "jobId": zod.coerce.string()
 })
 
+export const getMediaJobResponseProgressPercentMin = 0;
+export const getMediaJobResponseProgressPercentMax = 100;
+
+
+
 export const GetMediaJobResponse = zod.object({
   "id": zod.string(),
   "filename": zod.string(),
@@ -103,6 +130,11 @@ export const GetMediaJobResponse = zod.object({
   "outputUrl": zod.string().nullable(),
   "outputFilename": zod.string().nullable(),
   "outputMimeType": zod.string().nullable(),
+  "subtitleSource": zod.union([zod.literal('uploaded'),zod.literal('generated'),zod.literal(null)]).nullable(),
+  "subtitleUrl": zod.string().nullable(),
+  "subtitleFilename": zod.string().nullable(),
+  "progressPercent": zod.number().min(getMediaJobResponseProgressPercentMin).max(getMediaJobResponseProgressPercentMax),
+  "stage": zod.string(),
   "createdAt": zod.coerce.date(),
   "completedAt": zod.string().nullable(),
   "attempt": zod.number(),

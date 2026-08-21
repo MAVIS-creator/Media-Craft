@@ -13,6 +13,8 @@ export const MediaJobInputPreset = {
   'vertical-reel': 'vertical-reel',
   'extract-audio': 'extract-audio',
   'burn-subtitles': 'burn-subtitles',
+  'generate-subtitles': 'generate-subtitles',
   'compress-video': 'compress-video',
+  'upscale-video': 'upscale-video',
   custom: 'custom',
 } as const;

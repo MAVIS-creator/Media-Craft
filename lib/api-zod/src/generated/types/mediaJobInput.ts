@@ -6,9 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { MediaJobInputPreset } from './mediaJobInputPreset';
+import type { MediaJobInputSubtitleMode } from './mediaJobInputSubtitleMode';
 
 export interface MediaJobInput {
   file: Blob;
   preset?: MediaJobInputPreset;
   prompt?: string;
+  /** Optional SRT or VTT sidecar caption file. Required for burn-subtitles when subtitleMode is upload. */
+  subtitle?: Blob;
+  /** For burn-subtitles, upload a caption file or generate captions from the source audio. */
+  subtitleMode?: MediaJobInputSubtitleMode;
 }
