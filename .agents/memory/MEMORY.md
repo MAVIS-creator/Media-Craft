@@ -1,1 +1,2 @@
 - [MediaCraft processing fallback](mediacraft-processing.md) — keep local FFmpeg useful with visible, bounded repair attempts when managed Gemini is unavailable.
+- [GitHub synchronization](github-sync.md) — use the authenticated GitHub connector when legacy command-line credentials reject a repository update.
