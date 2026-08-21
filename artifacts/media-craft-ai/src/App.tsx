@@ -1918,11 +1918,14 @@ function StudioApp() {
                       file={file}
                       onFile={(next) => {
                         setFile(next);
+                        setJobId('');
                         setNotice('');
                       }}
                       onClear={() => {
                         setFile(null);
                         setSubtitleFile(null);
+                        setJobId('');
+                        setNotice('');
                       }}
                     />
                     {preset === 'burn-subtitles' && (
@@ -2046,7 +2049,7 @@ function StudioApp() {
 
         {/* Workspace Natural Language Input */}
         {activeView === 'workspace' && (
-          <section className="shrink-0 border-t border-slate-800 bg-slate-950/90 p-4 shadow-2xl backdrop-blur-md">
+           <section className="sticky bottom-0 z-20 shrink-0 border-t border-slate-800 bg-slate-950/95 p-4 shadow-2xl backdrop-blur-md">
             <div className="mx-auto w-full max-w-[1400px] px-1 sm:px-3 lg:px-5">
               <div className="mx-auto max-w-4xl">
                <form
