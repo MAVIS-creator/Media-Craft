@@ -1204,6 +1204,7 @@ function LiveStudioView({
   const isSucceeded = job.status === MediaJobStatus.succeeded;
   const isHealing = job.status === MediaJobStatus.healing;
   const isFailed = job.status === MediaJobStatus.failed;
+  const [shareMessage, setShareMessage] = useState('');
 
   const eventText = events.data ? String(events.data) : '';
   const eventLines = eventText.split('\n').filter(Boolean);
@@ -1221,10 +1222,35 @@ function LiveStudioView({
     }
   };
 
-  const copyShareLink = () => {
-    if (job.outputUrl) {
-      navigator.clipboard.writeText(window.location.origin + job.outputUrl);
+  const copyShareLink = async () => {
+    if (!job.outputUrl) {
+      setShareMessage('Link unavailable');
+      return;
     }
+
+    const shareUrl = new URL(job.outputUrl, window.location.origin).href;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+      } else {
+        throw new Error('Clipboard API unavailable');
+      }
+      setShareMessage('Copied');
+    } catch {
+      // Clipboard permissions are commonly blocked in embedded previews.
+      // Keep sharing useful with a user-visible, browser-compatible fallback.
+      const textarea = document.createElement('textarea');
+      textarea.value = shareUrl;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      const copied = document.execCommand('copy');
+      textarea.remove();
+      setShareMessage(copied ? 'Copied' : 'Copy blocked');
+    }
+    window.setTimeout(() => setShareMessage(''), 2200);
   };
 
   return (
@@ -1336,11 +1362,12 @@ function LiveStudioView({
                 {isSucceeded && (
                   <>
                     <button
-                      onClick={copyShareLink}
+                      type="button"
+                      onClick={() => void copyShareLink()}
                       className="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-[11px] font-bold text-slate-200 hover:bg-slate-700"
                     >
-                      <Share2 size={13} />
-                      Share
+                      {shareMessage === 'Copied' ? <Check size={13} className="text-emerald-400" /> : <Share2 size={13} />}
+                      {shareMessage || 'Share'}
                     </button>
 
                     <button
