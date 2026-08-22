@@ -14,3 +14,17 @@ mtime_ms = 1787314767758
 storage_uri = "gcs://replit-rams-assets-picard/rams/assets/repl:a67fe3ca-efc3-43be-a699-2c9fe813f0ed/6d9f9898-e2d3-46e2-a2df-6f8ce016f42b/7093de2e-25bb-46c7-8df9-f81e06a199e1"
 storage_version_token = "1787314818948267"
 content_type = "image/svg+xml"
+
+[[outputs]]
+id = "DdDRiZ8haKwjKoga58-R3"
+uri = "file://exports/mediacraft-ai-devpost-source.zip"
+type = "unspecified"
+title = "MediaCraft AI — Devpost Source ZIP"
+description = "Clean Devpost submission archive containing the MediaCraft frontend, API server, shared libraries, documentation, configuration, and license. Excludes node_modules, build output, Git history, screenshots, attachments, agent folders, and mockup tooling."
+logical_id = "9a1a7bdb-4091-4db9-95d2-4b53ca3a7303"
+content_hash = "sha256:6af01be6e650f590ee0b7a926712193a2d54379931c9fc0956dacff0cf45a723"
+size = 2791184
+mtime_ms = 1787357961200
+storage_uri = "gcs://replit-rams-assets-picard/rams/assets/repl:a67fe3ca-efc3-43be-a699-2c9fe813f0ed/9a1a7bdb-4091-4db9-95d2-4b53ca3a7303/d1e2f250-582a-4d5a-be1f-1241496c0308"
+storage_version_token = "1787357966260122"
+content_type = "application/octet-stream"
