@@ -22,12 +22,14 @@ const upload = multer({
 });
 
 const allowedPresets = new Set([
+  "smart-reframe",
+  "captions-hook",
+  "tighten-finish",
   "vertical-reel",
   "extract-audio",
   "burn-subtitles",
   "generate-subtitles",
   "compress-video",
-  "upscale-video",
   "custom",
 ]);
 
@@ -52,18 +54,21 @@ router.post("/media/jobs", upload.fields([{ name: "file", maxCount: 1 }, { name:
     return;
   }
 
-  const preset = typeof req.body.preset === "string" && allowedPresets.has(req.body.preset)
-    ? req.body.preset
-    : "custom";
+  const requestedPreset = typeof req.body.preset === "string" ? req.body.preset : null;
+  if (requestedPreset && !allowedPresets.has(requestedPreset)) {
+    res.status(400).json({ error: "That workflow is no longer available. Choose Smart Reframe, Captions & Hook, Tighten & Finish, Extract Audio, Compress for Delivery, or Custom." });
+    return;
+  }
+  const preset = requestedPreset ?? "custom";
   const prompt = typeof req.body.prompt === "string" ? req.body.prompt.slice(0, 1000) : "";
   const requestedSubtitleMode = req.body.subtitleMode === "generate" || req.body.subtitleMode === "upload"
     ? req.body.subtitleMode
-    : null;
-  if (subtitle && preset !== "burn-subtitles") {
-    res.status(400).json({ error: "A subtitle file can only be used with Burn Subtitles & Captions." });
+    : preset === "captions-hook" ? "generate" : null;
+  if (subtitle && preset !== "burn-subtitles" && preset !== "captions-hook") {
+    res.status(400).json({ error: "A subtitle file can only be used with Captions & Hook." });
     return;
   }
-  if (preset === "burn-subtitles" && !subtitle && requestedSubtitleMode !== "generate") {
+  if ((preset === "burn-subtitles" || preset === "captions-hook") && !subtitle && requestedSubtitleMode !== "generate") {
     res.status(400).json({ error: "Attach an SRT/VTT caption file or choose Generate Captions from Audio." });
     return;
   }

@@ -12,8 +12,8 @@ export interface MediaJobInput {
   file: Blob;
   preset?: MediaJobInputPreset;
   prompt?: string;
-  /** Optional SRT or VTT sidecar caption file. Required for burn-subtitles when subtitleMode is upload. */
+  /** Optional SRT or VTT sidecar caption file. Used by Captions & Hook when subtitleMode is upload. */
   subtitle?: Blob;
-  /** For burn-subtitles, upload a caption file or generate captions from the source audio. */
+  /** For Captions & Hook, upload a caption file or generate captions from the source audio. */
   subtitleMode?: MediaJobInputSubtitleMode;
 }

@@ -89,70 +89,59 @@ interface PresetDefinition {
 
 const PRESET_CATALOG: PresetDefinition[] = [
   {
-    key: 'vertical-reel',
-    label: 'TikTok / Reel (9:16)',
+    key: 'smart-reframe',
+    label: 'Smart Reframe',
     category: 'social',
-    categoryLabel: 'Social Media',
-    detail: '9:16 vertical reframe',
-    description: 'Auto-reframes landscape video to 9:16 vertical aspect ratio, center-crops and preserves high-fidelity audio.',
-    ffmpegPreview: '-vf "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920" -c:v libx264 -preset fast -crf 23 -c:a copy',
+    categoryLabel: 'Social Cut',
+    detail: 'AI focal point · 9:16',
+    description: 'Turn landscape footage into a social-ready vertical cut that keeps the speaker or action in frame.',
+    ffmpegPreview: 'Gemini saliency plan → safe 9:16 crop → verified H.264 master',
     icon: Scissors,
     color: 'from-blue-600 to-indigo-600',
   },
   {
+    key: 'captions-hook',
+    label: 'Captions & Hook',
+    category: 'captions',
+    categoryLabel: 'Social Cut',
+    detail: 'Bold hook captions',
+    description: 'Generate or upload captions, then finish the video with bold, high-contrast hook styling and clean audio.',
+    ffmpegPreview: 'Gemini transcription → validated captions → bold yellow open captions',
+    icon: Mic2,
+    color: 'from-rose-500 to-fuchsia-600',
+  },
+  {
+    key: 'tighten-finish',
+    label: 'Tighten & Finish',
+    category: 'compression',
+    categoryLabel: 'Finishing',
+    detail: 'Dead-air trim · audio polish',
+    description: 'Remove long pauses, join the clean speech segments, and normalize the finished soundtrack for delivery.',
+    ffmpegPreview: 'silencedetect → bounded jump cuts → loudnorm=-14 LUFS',
+    icon: Scissors,
+    color: 'from-emerald-500 to-teal-600',
+  },
+  {
     key: 'extract-audio',
-    label: 'Lossless Audio Extraction',
+    label: 'Extract Audio',
     category: 'audio',
-    categoryLabel: 'Audio Extraction',
-    detail: 'MP3 · 320 kbps · 48 kHz',
-    description: 'Strips video streams and extracts master audio to pristine MP3 format with high-quality LAME encoding.',
+    categoryLabel: 'Audio',
+    detail: 'MP3 · 320 kbps',
+    description: 'Create a clean MP3 master from video or audio source material.',
     ffmpegPreview: '-vn -c:a libmp3lame -b:a 320k -ar 48000',
     icon: AudioLines,
     color: 'from-amber-500 to-yellow-600',
   },
   {
-    key: 'burn-subtitles',
-    label: 'Burn Subtitles & Captions',
-    category: 'captions',
-    categoryLabel: 'Open Captions',
-    detail: 'Open captions overlay',
-    description: 'Burns a supplied SRT/VTT file or captions generated from the source audio directly into video frames.',
-    ffmpegPreview: '-vf "subtitles=server-owned-captions.srt:force_style=\'FontSize=24,Outline=2\'" -c:a copy',
-    icon: Mic2,
-    color: 'from-rose-500 to-red-600',
-  },
-  {
-    key: 'generate-subtitles',
-    label: 'Generate Timed Captions',
-    category: 'captions',
-    categoryLabel: 'AI Captions',
-    detail: 'Source audio → validated SRT',
-    description: 'Extracts clean source audio, transcribes it with Gemini, validates the timestamps, and returns a downloadable SRT file.',
-    ffmpegPreview: 'extract mono audio → Gemini transcription → timestamp validation → captions.srt',
-    icon: Mic2,
-    color: 'from-violet-500 to-fuchsia-600',
-  },
-  {
     key: 'compress-video',
-    label: 'Web-Ready H.264 Compress',
+    label: 'Compress for Delivery',
     category: 'compression',
-    categoryLabel: 'Video Encoding',
-    detail: '4K/1080p web downscale',
-    description: 'Lossless visual downscale to web-optimized H.264 MP4 with optimal streaming bitrate balance.',
-    ffmpegPreview: '-c:v libx264 -crf 22 -preset medium -movflags +faststart -c:a aac -b:a 192k',
+    categoryLabel: 'Finishing',
+    detail: 'Web-ready H.264',
+    description: 'Create a dependable, streaming-friendly H.264 master with a balanced quality-to-size ratio.',
+    ffmpegPreview: '-c:v libx264 -crf 22 -preset medium -movflags +faststart',
     icon: Gauge,
-    color: 'from-emerald-500 to-teal-600',
-  },
-  {
-    key: 'upscale-video',
-    label: 'Video Upscale 2×',
-    category: 'compression',
-    categoryLabel: 'Video Enhancement',
-    detail: '2× Lanczos upscale',
-    description: 'Doubles the frame dimensions using FFmpeg’s high-quality Lanczos scaler while preserving the source audio.',
-    ffmpegPreview: '-vf "scale=trunc(iw*2/2)*2:trunc(ih*2/2)*2:flags=lanczos" -c:v libx264 -crf 18 -c:a copy',
-    icon: Maximize2,
-    color: 'from-sky-500 to-cyan-600',
+    color: 'from-cyan-500 to-blue-600',
   },
   {
     key: 'custom',
@@ -200,7 +189,7 @@ const TOUR_STEPS = [
   },
   {
     title: 'Choose a finishing recipe',
-    body: 'Use a quick preset for common jobs like captions, compression, audio extraction, and 2× upscaling—or open Custom Gemini for a natural-language edit.',
+    body: 'Choose a focused finishing workflow for social reframing, captions, or tightening a cut—or open Custom Gemini for a natural-language edit.',
     target: '[data-tour="presets"]',
   },
   {
@@ -1176,12 +1165,107 @@ function StudioPlayer({
   );
 }
 
+function BeforeAfterPlayer({ source, output }: { source: string; output: string }) {
+  const sourceRef = useRef<HTMLVideoElement | null>(null);
+  const outputRef = useRef<HTMLVideoElement | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [position, setPosition] = useState(50);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  const togglePlayback = () => {
+    const sourceVideo = sourceRef.current;
+    const outputVideo = outputRef.current;
+    if (!sourceVideo || !outputVideo) return;
+    if (sourceVideo.paused) {
+      outputVideo.currentTime = sourceVideo.currentTime;
+      void Promise.all([sourceVideo.play(), outputVideo.play()]).then(() => setPlaying(true)).catch(() => setPlaying(false));
+    } else {
+      sourceVideo.pause();
+      outputVideo.pause();
+      setPlaying(false);
+    }
+  };
+
+  const seek = (value: number) => {
+    if (sourceRef.current) sourceRef.current.currentTime = value;
+    if (outputRef.current) outputRef.current.currentTime = value;
+    setCurrentTime(value);
+  };
+
+  return (
+    <div className="studio-player group relative h-full w-full overflow-hidden bg-[#07101f]">
+      <div className="absolute inset-0">
+        <video
+          ref={outputRef}
+          src={output}
+          playsInline
+          preload="metadata"
+          className="h-full w-full object-contain"
+          onLoadedMetadata={(event) => setDuration(event.currentTarget.duration)}
+          onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
+          onEnded={() => setPlaying(false)}
+        />
+        <div className="absolute inset-0 overflow-hidden" style={{ clipPath: `inset(0 ${100 - position}% 0 0)` }}>
+          <video ref={sourceRef} src={source} playsInline preload="metadata" className="h-full w-full object-contain" />
+        </div>
+      </div>
+      <div className="pointer-events-none absolute left-3 top-3 flex gap-2 font-mono text-[9px] uppercase tracking-wider text-white">
+        <span className="rounded bg-black/65 px-2 py-1">Source</span>
+        <span className="rounded bg-blue-600/85 px-2 py-1">Master</span>
+      </div>
+      <div className="absolute inset-y-0 z-10" style={{ left: `${position}%` }}>
+        <div className="h-full w-px bg-white shadow-[0_0_12px_rgba(255,255,255,.9)]" />
+        <div className="absolute left-1/2 top-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white bg-blue-600 text-xs font-bold text-white shadow-xl">
+          ↔
+        </div>
+      </div>
+      <div className="absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/95 via-black/70 to-transparent px-4 pb-3 pt-12">
+        <label className="mb-2 block font-mono text-[9px] uppercase tracking-wider text-white/70">
+          Before / after split
+          <input
+            aria-label="Before and after split position"
+            type="range"
+            min="0"
+            max="100"
+            value={position}
+            onChange={(event) => setPosition(Number(event.target.value))}
+            className="studio-range mt-2 w-full"
+            style={{ '--range-progress': `${position}%` } as CSSProperties}
+          />
+        </label>
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={togglePlayback} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-slate-950" aria-label={playing ? 'Pause comparison' : 'Play comparison'}>
+            {playing ? <span className="text-[12px] font-black">Ⅱ</span> : <Play size={14} fill="currentColor" />}
+          </button>
+          <input
+            aria-label="Seek through comparison"
+            type="range"
+            min="0"
+            max={duration || 0}
+            step="0.01"
+            value={Math.min(currentTime, duration || 0)}
+            onChange={(event) => seek(Number(event.target.value))}
+            className="studio-range min-w-0 flex-1"
+            style={{ '--range-progress': `${duration ? (currentTime / duration) * 100 : 0}%` } as CSSProperties}
+          />
+          <span className="w-[82px] text-right font-mono text-[10px] tabular-nums text-white/80">
+            {formatPlayerTime(currentTime)} <span className="text-white/40">/</span> {formatPlayerTime(duration)}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function LiveStudioView({
   job,
   onNavigateToPresets,
+  sourceFile,
 }: {
   job: NonNullable<MediaJob>;
   onNavigateToPresets: () => void;
+  sourceFile?: File | null;
 }) {
   const events = useStreamMediaJobEvents(job.id, {
     query: {
@@ -1205,6 +1289,17 @@ function LiveStudioView({
   const isHealing = job.status === MediaJobStatus.healing;
   const isFailed = job.status === MediaJobStatus.failed;
   const [shareMessage, setShareMessage] = useState('');
+  const [sourcePreviewUrl, setSourcePreviewUrl] = useState('');
+
+  useEffect(() => {
+    if (!sourceFile || !job.mediaInfo.hasVideo) {
+      setSourcePreviewUrl('');
+      return;
+    }
+    const url = URL.createObjectURL(sourceFile);
+    setSourcePreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [job.id, job.mediaInfo.hasVideo, sourceFile]);
 
   const eventText = events.data ? String(events.data) : '';
   const eventLines = eventText.split('\n').filter(Boolean);
@@ -1300,7 +1395,9 @@ function LiveStudioView({
         <div className="lg:col-span-8 space-y-4">
           <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 shadow-2xl">
             <div className="relative aspect-video w-full bg-slate-900 flex items-center justify-center overflow-hidden lg:aspect-[16/10]">
-               {isSucceeded && job.outputUrl && !isCaptionOutput ? (
+                {isSucceeded && job.outputUrl && sourcePreviewUrl && isVideo && !isCaptionOutput ? (
+                 <BeforeAfterPlayer source={sourcePreviewUrl} output={job.outputUrl} />
+                ) : isSucceeded && job.outputUrl && !isCaptionOutput ? (
                 <StudioPlayer
                   src={job.outputUrl}
                   isVideo={isVideo}
@@ -1705,7 +1802,7 @@ function StudioApp() {
   const [file, setFile] = useState<File | null>(null);
   const [subtitleFile, setSubtitleFile] = useState<File | null>(null);
   const [subtitleMode, setSubtitleMode] = useState<'upload' | 'generate'>('generate');
-  const [preset, setPreset] = useState<Preset>('vertical-reel');
+  const [preset, setPreset] = useState<Preset>('smart-reframe');
   const [prompt, setPrompt] = useState('');
   const [jobId, setJobId] = useState('');
   const [notice, setNotice] = useState('');
@@ -1789,7 +1886,7 @@ function StudioApp() {
       setNotice('Select or drop a source media file first.');
       return;
     }
-    if (preset === 'burn-subtitles' && subtitleMode === 'upload' && !subtitleFile) {
+    if (preset === 'captions-hook' && subtitleMode === 'upload' && !subtitleFile) {
       setNotice('Choose an SRT or VTT file, or switch to Generate from video audio.');
       return;
     }
@@ -1800,7 +1897,7 @@ function StudioApp() {
           file,
           preset,
           prompt: prompt.trim() || undefined,
-          ...(preset === 'burn-subtitles'
+          ...(preset === 'captions-hook'
             ? { subtitleMode, subtitle: subtitleMode === 'upload' ? subtitleFile ?? undefined : undefined }
             : {}),
         },
@@ -1826,7 +1923,7 @@ function StudioApp() {
     setPrompt('');
     setJobId('');
     setNotice('');
-    setPreset('vertical-reel');
+    setPreset('smart-reframe');
     setActiveView('workspace');
   };
 
@@ -1865,7 +1962,7 @@ function StudioApp() {
 
         <div className="studio-content page-content-shell mx-auto w-full max-w-[1400px] flex-1 px-5 py-7 sm:px-8 lg:px-10">
           {activeView === 'live' && job ? (
-            <LiveStudioView job={job} onNavigateToPresets={() => setActiveView('presets')} />
+            <LiveStudioView job={job} sourceFile={file} onNavigateToPresets={() => setActiveView('presets')} />
           ) : activeView === 'presets' ? (
             <PresetsLibraryView onSelectPreset={applyPresetFromLibrary} />
           ) : activeView === 'recent' || activeView === 'archive' ? (
@@ -1928,7 +2025,7 @@ function StudioApp() {
                         setNotice('');
                       }}
                     />
-                    {preset === 'burn-subtitles' && (
+                    {preset === 'captions-hook' && (
                       <div className="mt-4">
                         <CaptionSourcePicker
                           subtitleFile={subtitleFile}
@@ -1941,13 +2038,24 @@ function StudioApp() {
                         />
                       </div>
                     )}
-                    {preset === 'generate-subtitles' && (
-                      <div className="mt-4 flex items-start gap-3 rounded-2xl border border-violet-800/70 bg-violet-950/20 p-4">
-                        <div className="rounded-xl border border-violet-700/70 bg-violet-900/40 p-2 text-violet-200"><Mic2 size={17} /></div>
+                    {preset === 'smart-reframe' && (
+                      <div className="mt-4 flex items-start gap-3 rounded-2xl border border-blue-800/70 bg-blue-950/20 p-4">
+                        <div className="rounded-xl border border-blue-700/70 bg-blue-900/40 p-2 text-blue-200"><Scissors size={17} /></div>
                         <div>
-                          <div className="text-[12px] font-bold text-white">Timed caption generation</div>
+                          <div className="text-[12px] font-bold text-white">Smart focal framing</div>
                           <p className="mt-0.5 text-[10px] leading-relaxed text-slate-400">
-                            MediaCraft extracts the source audio, asks Gemini for a timestamped transcription, validates the SRT, and gives you a caption file to download.
+                            Gemini keeps the main speaker or action in the 9:16 frame, then MediaCraft validates and renders the crop.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    {preset === 'tighten-finish' && (
+                      <div className="mt-4 flex items-start gap-3 rounded-2xl border border-emerald-800/70 bg-emerald-950/20 p-4">
+                        <div className="rounded-xl border border-emerald-700/70 bg-emerald-900/40 p-2 text-emerald-200"><Volume2 size={17} /></div>
+                        <div>
+                          <div className="text-[12px] font-bold text-white">Automatic finishing pass</div>
+                          <p className="mt-0.5 text-[10px] leading-relaxed text-slate-400">
+                            Long pauses are detected and removed, then the remaining dialogue is joined and normalized for delivery.
                           </p>
                         </div>
                       </div>

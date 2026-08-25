@@ -67,10 +67,10 @@ export const ListMediaJobsResponse = zod.array(ListMediaJobsResponseItem)
  */
 export const CreateMediaJobBody = zod.object({
   "file": zod.instanceof(File),
-  "preset": zod.enum(['vertical-reel', 'extract-audio', 'burn-subtitles', 'generate-subtitles', 'compress-video', 'upscale-video', 'custom']).optional(),
+  "preset": zod.enum(['smart-reframe', 'captions-hook', 'tighten-finish', 'vertical-reel', 'extract-audio', 'burn-subtitles', 'generate-subtitles', 'compress-video', 'custom']).optional(),
   "prompt": zod.string().optional(),
-  "subtitle": zod.instanceof(File).optional().describe('Optional SRT or VTT sidecar caption file. Required for burn-subtitles when subtitleMode is upload.'),
-  "subtitleMode": zod.enum(['upload', 'generate']).optional().describe('For burn-subtitles, upload a caption file or generate captions from the source audio.')
+  "subtitle": zod.instanceof(File).optional().describe('Optional SRT or VTT sidecar caption file. Used by Captions & Hook when subtitleMode is upload.'),
+  "subtitleMode": zod.enum(['upload', 'generate']).optional().describe('For Captions & Hook, upload a caption file or generate captions from the source audio.')
 })
 
 export const createMediaJobResponseProgressPercentMin = 0;

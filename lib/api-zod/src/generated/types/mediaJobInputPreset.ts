@@ -10,11 +10,13 @@ export type MediaJobInputPreset = typeof MediaJobInputPreset[keyof typeof MediaJ
 
 
 export const MediaJobInputPreset = {
+  'smart-reframe': 'smart-reframe',
+  'captions-hook': 'captions-hook',
+  'tighten-finish': 'tighten-finish',
   'vertical-reel': 'vertical-reel',
   'extract-audio': 'extract-audio',
   'burn-subtitles': 'burn-subtitles',
   'generate-subtitles': 'generate-subtitles',
   'compress-video': 'compress-video',
-  'upscale-video': 'upscale-video',
   custom: 'custom',
 } as const;

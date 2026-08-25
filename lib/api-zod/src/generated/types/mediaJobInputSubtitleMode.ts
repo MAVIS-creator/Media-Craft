@@ -7,7 +7,7 @@
  */
 
 /**
- * For burn-subtitles, upload a caption file or generate captions from the source audio.
+ * For Captions & Hook, upload a caption file or generate captions from the source audio.
  */
 export type MediaJobInputSubtitleMode = typeof MediaJobInputSubtitleMode[keyof typeof MediaJobInputSubtitleMode];
 

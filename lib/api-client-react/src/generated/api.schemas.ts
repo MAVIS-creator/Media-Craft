@@ -13,17 +13,19 @@ export type MediaJobInputPreset = typeof MediaJobInputPreset[keyof typeof MediaJ
 
 
 export const MediaJobInputPreset = {
+  'smart-reframe': 'smart-reframe',
+  'captions-hook': 'captions-hook',
+  'tighten-finish': 'tighten-finish',
   'vertical-reel': 'vertical-reel',
   'extract-audio': 'extract-audio',
   'burn-subtitles': 'burn-subtitles',
   'generate-subtitles': 'generate-subtitles',
   'compress-video': 'compress-video',
-  'upscale-video': 'upscale-video',
   custom: 'custom',
 } as const;
 
 /**
- * For burn-subtitles, upload a caption file or generate captions from the source audio.
+ * For Captions & Hook, upload a caption file or generate captions from the source audio.
  */
 export type MediaJobInputSubtitleMode = typeof MediaJobInputSubtitleMode[keyof typeof MediaJobInputSubtitleMode];
 
@@ -37,9 +39,9 @@ export interface MediaJobInput {
   file: Blob;
   preset?: MediaJobInputPreset;
   prompt?: string;
-  /** Optional SRT or VTT sidecar caption file. Required for burn-subtitles when subtitleMode is upload. */
+  /** Optional SRT or VTT sidecar caption file. Used by Captions & Hook when subtitleMode is upload. */
   subtitle?: Blob;
-  /** For burn-subtitles, upload a caption file or generate captions from the source audio. */
+  /** For Captions & Hook, upload a caption file or generate captions from the source audio. */
   subtitleMode?: MediaJobInputSubtitleMode;
 }
 

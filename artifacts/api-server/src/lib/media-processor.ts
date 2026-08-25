@@ -19,6 +19,9 @@ export type MediaJobStatus =
   | "failed";
 
 export type MediaPreset =
+  | "smart-reframe"
+  | "captions-hook"
+  | "tighten-finish"
   | "vertical-reel"
   | "extract-audio"
   | "burn-subtitles"
@@ -90,6 +93,12 @@ function isAudioFile(filename: string): boolean {
 
 function presetInstruction(preset: MediaPreset): string {
   return {
+    "smart-reframe":
+      "Create a polished 9:16 social reel with smart saliency framing. Keep the main speaker or action centered over time instead of using a static center crop. Use safe, widely available FFmpeg filters and preserve important audio.",
+    "captions-hook":
+      "Create a social-ready video with readable bold hook captions. Generate accurate timed captions from the source audio, style them with high-contrast yellow text, dark outline, and strong lower-third placement, then burn them into the video.",
+    "tighten-finish":
+      "Tighten this edit by removing dead air and long pauses while keeping speech natural. Clean and normalize the remaining audio to a sensible streaming loudness target and preserve the video.",
     "vertical-reel":
       "Convert this source into a polished 9:16 vertical reel for social media, preserving the important audio.",
     "extract-audio":
@@ -127,6 +136,24 @@ function escapeSubtitleFilterPath(filePath: string): string {
 function deterministicPresetArgs(job: MediaJob, outputPath: string, subtitlePath?: string): string[] | null {
   const input = job.inputPath;
   switch (job.preset) {
+    case "captions-hook":
+      if (!job.mediaInfo.hasVideo) throw new Error("Captions & Hook requires a video source.");
+      if (!subtitlePath) throw new Error("Captions & Hook needs generated or uploaded captions.");
+      return [
+        "-y", "-i", input,
+        "-vf", `subtitles='${escapeSubtitleFilterPath(subtitlePath)}':force_style='FontName=Arial,FontSize=28,Bold=1,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,Outline=3,Shadow=1,Alignment=2,MarginV=70'`,
+        "-map", "0:v:0", "-map", "0:a?",
+        "-c:v", "libx264", "-preset", "medium", "-crf", "20",
+        "-c:a", "aac", "-b:a", "192k", "-af", "loudnorm=I=-14:TP=-1.5:LRA=11",
+        "-movflags", "+faststart",
+        outputPath,
+      ];
+    case "smart-reframe":
+      if (!job.mediaInfo.hasVideo) throw new Error("Smart Reframe requires a video source.");
+      return null;
+    case "tighten-finish":
+      if (!job.mediaInfo.hasVideo || !job.mediaInfo.hasAudio) throw new Error("Tighten & Finish requires video with an audio track.");
+      return null;
     case "vertical-reel":
       if (!job.mediaInfo.hasVideo) throw new Error("Vertical Reel requires a video source.");
       return [
@@ -179,6 +206,59 @@ function deterministicPresetArgs(job: MediaJob, outputPath: string, subtitlePath
     case "generate-subtitles":
       return null;
   }
+}
+
+async function buildTightenArgs(job: MediaJob, outputPath: string): Promise<string[]> {
+  event(job, "Scanning audio for dead air longer than 0.5 seconds.", 34, "detecting-silence");
+  const scan = await runFfmpeg([
+    "-hide_banner", "-i", job.inputPath,
+    "-af", "silencedetect=noise=-35dB:d=0.5",
+    "-f", "null", "-",
+  ]);
+  if (scan.code !== 0) throw new Error(`Silence detection failed: ${scan.stderr.trim() || "FFmpeg could not scan the audio."}`);
+
+  const starts = [...scan.stderr.matchAll(/silence_start:\s*([0-9.]+)/g)].map((match) => Number(match[1]));
+  const ends = [...scan.stderr.matchAll(/silence_end:\s*([0-9.]+)/g)].map((match) => Number(match[1]));
+  const ranges: Array<[number, number]> = [];
+  let cursor = 0;
+  for (let index = 0; index < starts.length && ranges.length < 30; index += 1) {
+    const start = Math.max(cursor, starts[index]);
+    const end = ends[index] ?? job.mediaInfo.durationSeconds;
+    if (start - cursor > 0.08) ranges.push([cursor, start]);
+    cursor = Math.max(cursor, end);
+  }
+  if (job.mediaInfo.durationSeconds - cursor > 0.08) ranges.push([cursor, job.mediaInfo.durationSeconds]);
+  if (ranges.length === 0) {
+    return [
+      "-y", "-i", job.inputPath, "-map", "0:v:0", "-map", "0:a?",
+      "-c:v", "libx264", "-preset", "medium", "-crf", "22",
+      "-c:a", "aac", "-b:a", "192k", "-af", "loudnorm=I=-14:TP=-1.5:LRA=11",
+      "-movflags", "+faststart", outputPath,
+    ];
+  }
+
+  event(job, `Found ${ranges.length} spoken segment${ranges.length === 1 ? "" : "s"}; building a tight cut.`, 48, "building-jump-cut");
+  const filterParts: string[] = [];
+  const videoLabels: string[] = [];
+  const audioLabels: string[] = [];
+  ranges.forEach(([start, end], index) => {
+    const v = `v${index}`;
+    const a = `a${index}`;
+    filterParts.push(`[0:v]trim=start=${start.toFixed(3)}:end=${end.toFixed(3)},setpts=PTS-STARTPTS[${v}]`);
+    filterParts.push(`[0:a]atrim=start=${start.toFixed(3)}:end=${end.toFixed(3)},asetpts=PTS-STARTPTS[${a}]`);
+    videoLabels.push(`[${v}]`);
+    audioLabels.push(`[${a}]`);
+  });
+  filterParts.push(`${videoLabels.join("")}concat=n=${ranges.length}:v=1:a=0[vout]`);
+  filterParts.push(`${audioLabels.join("")}concat=n=${ranges.length}:v=0:a=1, loudnorm=I=-14:TP=-1.5:LRA=11[aout]`);
+  return [
+    "-y", "-i", job.inputPath,
+    "-filter_complex", filterParts.join(";"),
+    "-map", "[vout]", "-map", "[aout]",
+    "-c:v", "libx264", "-preset", "medium", "-crf", "20",
+    "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart",
+    outputPath,
+  ];
 }
 
 async function createGeneratedSubtitle(job: MediaJob, directory: string): Promise<string> {
@@ -382,7 +462,11 @@ async function processJob(id: string): Promise<void> {
   };
 
   try {
-    if (job.preset === "generate-subtitles" || (job.preset === "burn-subtitles" && job.subtitleMode === "generate")) {
+    if (
+      job.preset === "generate-subtitles" ||
+      job.preset === "captions-hook" ||
+      (job.preset === "burn-subtitles" && job.subtitleMode === "generate")
+    ) {
       await createGeneratedSubtitle(job, directory);
     }
 
@@ -400,12 +484,14 @@ async function processJob(id: string): Promise<void> {
       return;
     }
 
-    if (job.preset === "burn-subtitles" && !job.subtitlePath) {
+    if ((job.preset === "burn-subtitles" || job.preset === "captions-hook") && !job.subtitlePath) {
       throw new Error("Attach an SRT/VTT caption file or select Generate Captions from Audio before burning subtitles.");
     }
 
     job.outputPath = outputPath;
-    const deterministicArgs = deterministicPresetArgs(job, outputPath, job.subtitlePath ?? undefined);
+    const deterministicArgs = job.preset === "tighten-finish"
+      ? await buildTightenArgs(job, outputPath)
+      : deterministicPresetArgs(job, outputPath, job.subtitlePath ?? undefined);
     const instruction = job.prompt.trim() || presetInstruction(job.preset);
     const attemptLimit = deterministicArgs ? 1 : maxAttempts;
     let stderr = "";

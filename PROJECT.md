@@ -9,11 +9,11 @@ MediaCraft is a media transformation and finishing tool. It accepts an uploaded 
 It can produce:
 
 - MP4 video masters
-- 9:16 vertical social reels
+- AI-assisted 9:16 social reframes that keep the focal subject in view
 - Web-ready compressed H.264 video
-- Subtitle-burned video from an uploaded SRT/VTT file or captions generated from the source audio
+- Captioned social cuts with generated or uploaded subtitles and bold hook styling
 - Downloadable, timed SRT captions generated from source audio
-- 2× upscaled H.264 video
+- Tightened jump-cut video with dead-air removal and normalized audio
 - MP3 audio extracted from video
 - MP3 audio converted or transformed from supported audio sources
 - Custom video and audio edits described in natural language
@@ -22,12 +22,12 @@ It does not currently generate entirely new AI video scenes, characters, images,
 
 ## Processing pipeline
 
-1. The frontend sends one supported file, a preset/instruction, and optionally an SRT/VTT sidecar for manual subtitle burning.
+1. The frontend sends one supported file, a workflow/instruction, and optionally an SRT/VTT sidecar for Captions & Hook.
 2. Multer temporarily receives the upload.
 3. The API moves it into a server-owned temporary job directory.
 4. `ffprobe` validates the file and reads duration, format, streams, size, and codecs.
 5. Built-in recipes use tested server-side FFmpeg argument arrays; Gemini 2.5 Flash converts Custom instructions into a validated JSON FFmpeg argument array.
-6. Parallel Search optionally supplies current technical context about codecs, formats, and FFmpeg behavior.
+6. Smart Reframe and Custom workflows can use Gemini plus optional Parallel Search technical grounding; deterministic workflows use server-controlled FFmpeg recipes.
 7. MediaCraft validates the generated arguments and replaces its server-owned input/output placeholders.
 8. FFmpeg runs with `spawn("ffmpeg", args)`, never through a shell.
 9. MediaCraft confirms that FFmpeg exited successfully and produced a non-empty output.
@@ -46,16 +46,17 @@ Input extensions:
 
 Uploads are limited to 4 GB. A file must contain at least one usable audio or video stream and a valid positive duration.
 
-Available presets:
+Available workflows:
 
-| Preset | Result |
+| Workflow | Result |
 | --- | --- |
-| `vertical-reel` | Creates a polished 9:16 social-video version |
+| `smart-reframe` | Uses a bounded Gemini plan to create a polished 9:16 social-video version |
+| `captions-hook` | Generates or accepts captions, then burns a bold high-contrast caption treatment |
+| `tighten-finish` | Detects longer pauses, joins speech segments, and normalizes the finished audio |
 | `extract-audio` | Produces an MP3 and removes the video stream |
 | `burn-subtitles` | Burns an uploaded SRT/VTT file or generated captions into a video |
 | `generate-subtitles` | Extracts source audio, transcribes it, and returns validated timed SRT captions |
 | `compress-video` | Produces a web-ready H.264 MP4 |
-| `upscale-video` | Doubles video dimensions with a high-quality Lanczos upscale |
 | `custom` | Uses the user's natural-language instruction |
 
 ## Install and configure
@@ -167,7 +168,7 @@ The API base path is `/api`.
 | Field | Required | Description |
 | --- | --- | --- |
 | `file` | Yes | One supported video or audio file |
-| `preset` | No | `vertical-reel`, `extract-audio`, `burn-subtitles`, `generate-subtitles`, `compress-video`, `upscale-video`, or `custom` |
+| `preset` | No | `smart-reframe`, `captions-hook`, `tighten-finish`, `extract-audio`, `compress-video`, or `custom` |
 | `prompt` | No | Natural-language instruction, limited to 1,000 characters |
 | `subtitle` | No | UTF-8 `.srt` or `.vtt` caption sidecar, accepted only for `burn-subtitles` |
 | `subtitleMode` | No | For `burn-subtitles`: `upload` for the sidecar file or `generate` to create captions from source audio before burning |
