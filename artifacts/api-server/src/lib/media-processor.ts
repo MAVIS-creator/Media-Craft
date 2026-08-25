@@ -8,8 +8,8 @@ import { generateFfmpegArgs, resolveFfmpegArgs } from "./gemini-ffmpeg";
 import { recordGrafanaJobEvent, recordSelfHealEvent } from "./grafana-mcp";
 import { logToClickHouse } from "./clickhouse-mcp";
 import { getParallelStatus } from "./parallel-search";
-import { generateSrtFromAudio } from "./gemini-captions";
-import { validateGeneratedSrt } from "./subtitle-utils";
+import { generateCaptionBundleFromAudio } from "./gemini-captions";
+import { generateAssWithKaraokeHighlight, validateGeneratedSrt } from "./subtitle-utils";
 
 export type MediaJobStatus =
   | "queued"
@@ -59,7 +59,8 @@ export type MediaJob = {
   error: string | null;
   mediaInfo: MediaInspection;
   subtitlePath: string | null;
-  subtitleMode: "upload" | "generate" | null;
+  subtitleMode: "upload" | "generate" | "standard" | "karaoke" | "none" | null;
+  subtitleOutput: "burn" | "file" | null;
   inputPath: string;
   outputPath: string | null;
   events: string[];
@@ -282,18 +283,26 @@ async function createGeneratedSubtitle(job: MediaJob, directory: string): Promis
   }
 
   event(job, "Gemini is transcribing the extracted audio into timed captions.", 45, "generating-captions");
-  const srt = validateGeneratedSrt(await generateSrtFromAudio({
+  const generated = await generateCaptionBundleFromAudio({
     audioPath,
     durationSeconds: job.mediaInfo.durationSeconds,
     onRetry: () => event(job, "Gemini is briefly busy; retrying caption transcription once.", 46, "retrying-transcription"),
-  }), job.mediaInfo.durationSeconds);
-  const subtitlePath = path.join(directory, "generated-captions.srt");
-  await writeFile(subtitlePath, srt, "utf8");
+  });
+  const srt = validateGeneratedSrt(generated.srt, job.mediaInfo.durationSeconds);
+  const karaoke = job.subtitleMode === "karaoke";
+  const subtitleText = karaoke && generated.words.length
+    ? generateAssWithKaraokeHighlight(generated.words)
+    : srt;
+  const subtitleExtension = karaoke && generated.words.length ? "ass" : "srt";
+  const subtitlePath = path.join(directory, `generated-captions.${subtitleExtension}`);
+  await writeFile(subtitlePath, subtitleText, "utf8");
   job.subtitlePath = subtitlePath;
   job.subtitleSource = "generated";
-  job.subtitleFilename = `${safeBaseName(job.filename)}-captions.srt`;
+  job.subtitleFilename = `${safeBaseName(job.filename)}-captions.${subtitleExtension}`;
   job.subtitleUrl = `/api/media/jobs/${job.id}/subtitles`;
-  event(job, "Timed captions generated and validated against the source audio.", 60, "captions-ready");
+  event(job, karaoke && generated.words.length
+    ? "Word-level caption timing generated and validated; active-word ASS file is ready."
+    : "Timed captions generated and validated against the source audio.", 60, "captions-ready");
   return subtitlePath;
 }
 
@@ -381,7 +390,8 @@ export function createJob(input: {
   prompt: string;
   mediaInfo: MediaInspection;
   subtitlePath?: string | null;
-  subtitleMode?: "upload" | "generate" | null;
+  subtitleMode?: "upload" | "generate" | "standard" | "karaoke" | "none" | null;
+  subtitleOutput?: "burn" | "file" | null;
 }): MediaJob {
   const id = randomUUID();
   const job: MediaJob = {
@@ -403,6 +413,7 @@ export function createJob(input: {
     mediaInfo: input.mediaInfo,
     subtitlePath: input.subtitlePath ?? null,
     subtitleMode: input.subtitleMode ?? null,
+    subtitleOutput: input.subtitleOutput ?? null,
     inputPath: input.inputPath,
     outputPath: null,
     events: [],
@@ -464,18 +475,18 @@ async function processJob(id: string): Promise<void> {
   try {
     if (
       job.preset === "generate-subtitles" ||
-      job.preset === "captions-hook" ||
+      (job.preset === "captions-hook" && job.subtitleMode !== "none" && job.subtitleOutput !== "file") ||
       (job.preset === "burn-subtitles" && job.subtitleMode === "generate")
     ) {
       await createGeneratedSubtitle(job, directory);
     }
 
-    if (job.preset === "generate-subtitles") {
+    if (job.preset === "generate-subtitles" || (job.preset === "captions-hook" && job.subtitleOutput === "file")) {
       if (!job.subtitlePath || !job.subtitleFilename) throw new Error("Caption generation did not create a subtitle file.");
       job.outputPath = job.subtitlePath;
       job.outputFilename = job.subtitleFilename;
       job.outputUrl = `/api/media/jobs/${id}/output`;
-      job.outputMimeType = "application/x-subrip";
+       job.outputMimeType = job.subtitleFilename.endsWith(".ass") ? "text/x-ass" : "application/x-subrip";
       job.status = "succeeded";
       job.completedAt = new Date().toISOString();
       event(job, `GREEN · Captions are ready at ${job.subtitleFilename}.`, 100, "completed");
@@ -484,13 +495,15 @@ async function processJob(id: string): Promise<void> {
       return;
     }
 
-    if ((job.preset === "burn-subtitles" || job.preset === "captions-hook") && !job.subtitlePath) {
+    if ((job.preset === "burn-subtitles" || job.preset === "captions-hook") && job.subtitleMode !== "none" && !job.subtitlePath) {
       throw new Error("Attach an SRT/VTT caption file or select Generate Captions from Audio before burning subtitles.");
     }
 
     job.outputPath = outputPath;
     const deterministicArgs = job.preset === "tighten-finish"
       ? await buildTightenArgs(job, outputPath)
+      : job.preset === "captions-hook" && job.subtitleMode === "none"
+        ? deterministicPresetArgs({ ...job, preset: "compress-video" }, outputPath)
       : deterministicPresetArgs(job, outputPath, job.subtitlePath ?? undefined);
     const instruction = job.prompt.trim() || presetInstruction(job.preset);
     const attemptLimit = deterministicArgs ? 1 : maxAttempts;

@@ -3,6 +3,11 @@ import { z } from "zod";
 
 const CaptionPayload = z.object({
   srt: z.string().min(1).max(2_000_000),
+  words: z.array(z.object({
+    word: z.string().min(1).max(100),
+    start: z.number().finite().nonnegative(),
+    end: z.number().finite().positive(),
+  })).max(50_000).optional(),
 });
 
 function requireApiKey(): string {
@@ -17,11 +22,11 @@ function sleep(milliseconds: number) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
-export async function generateSrtFromAudio(input: {
+export async function generateCaptionBundleFromAudio(input: {
   audioPath: string;
   durationSeconds: number;
   onRetry?: () => void;
-}): Promise<string> {
+}): Promise<{ srt: string; words: Array<{ word: string; start: number; end: number }> }> {
   const client = new GoogleGenAI({ apiKey: requireApiKey() });
   let uploadedName: string | undefined;
 
@@ -58,13 +63,14 @@ export async function generateSrtFromAudio(input: {
               },
             },
             {
-              text: `Transcribe this audio into accurate, timed SRT subtitles.
+              text: `Transcribe this audio into accurate, timed subtitles and word-level timestamps.
 
 The source duration is approximately ${input.durationSeconds.toFixed(2)} seconds.
 Use the spoken language from the audio. Preserve meaning and natural punctuation.
 Create sequential SRT cues with HH:MM:SS,mmm --> HH:MM:SS,mmm timestamps.
+Also return a words array with one entry per spoken word and precise start/end offsets in seconds.
 Never invent speech, instructions, speaker labels, or a summary.
-Return JSON only in exactly this shape: {"srt":"1\\n00:00:00,000 --> 00:00:02,000\\nCaption text\\n"}.`,
+Return JSON only in exactly this shape: {"srt":"1\\n00:00:00,000 --> 00:00:02,000\\nCaption text\\n","words":[{"word":"Caption","start":0,"end":0.6}]}.`,
             },
           ],
         },
@@ -103,7 +109,13 @@ Return JSON only in exactly this shape: {"srt":"1\\n00:00:00,000 --> 00:00:02,00
     if (!parsed.success) {
       throw new Error("Gemini returned an invalid caption payload.");
     }
-    return parsed.data.srt.replace(/\r\n/g, "\n").trim();
+    const words = (parsed.data.words ?? []).filter((word) =>
+      word.word.trim() && word.end > word.start && word.start <= input.durationSeconds + 2 && word.end <= input.durationSeconds + 2
+    );
+    return {
+      srt: parsed.data.srt.replace(/\r\n/g, "\n").trim(),
+      words,
+    };
   } finally {
     if (uploadedName) {
       try {
@@ -113,4 +125,12 @@ Return JSON only in exactly this shape: {"srt":"1\\n00:00:00,000 --> 00:00:02,00
       }
     }
   }
+}
+
+export async function generateSrtFromAudio(input: {
+  audioPath: string;
+  durationSeconds: number;
+  onRetry?: () => void;
+}): Promise<string> {
+  return (await generateCaptionBundleFromAudio(input)).srt;
 }

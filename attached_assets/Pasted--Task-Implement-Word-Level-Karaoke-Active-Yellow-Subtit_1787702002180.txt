@@ -1,0 +1,54 @@
+### Task: Implement Word-Level Karaoke / Active-Yellow Subtitle Generation & Mode Selector
+
+#### 1. Goal & Visual Styling (Carter PC Aesthetic)
+Update MediaCraft's subtitle generation to support two distinct modes:
+1. **Dynamic Karaoke / Active Highlight (Default for social videos):**
+   - Renders 2–4 words per line in the lower-middle portion of the screen.
+   - **Inactive Words:** Bold White (`&H00FFFFFF`) with a thick black outline (`&H00000000`, Outline width 3–4px) and subtle drop shadow.
+   - **Active Spoken Word:** Instantly changes color to Bright Yellow (`&H0000FFFF` in BGR ASS format: `\c&H00FFFF&` or `\1c&H00FFFF&`) while spoken.
+   - **Font:** Bold, clean sans-serif (e.g., Arial Black / Montserrat / Impact, uppercase, FontSize 28–36 depending on 9:16 vs 16:9).
+2. **Standard Subtitles (Clean / Static Mode):**
+   - Clean, standard centered white text with black border, without color switching.
+
+---
+
+#### 2. Backend & Subtitle Architecture (`lib/gemini-captions.ts` & `lib/subtitle-utils.ts`)
+1. **Gemini Prompt for Word Timestamps:**
+   - Update the caption generator prompt in `gemini-captions.ts` to request word-level timing offsets `[{ word: string, start: number, end: number }]`.
+2. **ASS (Advanced SubStation Alpha) Generator:**
+   - Create a helper `generateAssWithKaraokeHighlight(words, styleOptions)` in `subtitle-utils.ts`.
+   - Structure the `.ass` header with:
+     ```ini
+     [Script Info]
+     ScriptType: v4.00+
+     PlayResX: 1080
+     PlayResY: 1920
+
+     [V4+ Styles]
+     Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+     Style: CarterPC,Arial,48,&H00FFFFFF,&H0000FFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,4,2,2,40,40,280,1
+     ```
+   - For each spoken segment, output dialogue lines using inline color overrides for the active word (e.g. `Dialogue: 0,0:00:01.00,0:00:01.40,CarterPC,,0,0,0,,{\c&H00FFFF&}DOES{\c&HFFFFFF&} THAT SAY` followed by `Dialogue: 0,0:00:01.40,0:00:01.80,CarterPC,,0,0,0,,DOES {\c&H00FFFF&}THAT{\c&HFFFFFF&} SAY`).
+   - If **Standard Mode** is selected, output normal non-highlighted SRT or clean ASS dialogue without color tags.
+3. **FFmpeg Execution Filter:**
+   - Update `media-processor.ts` / `gemini-ffmpeg.ts` to burn the generated `.ass` file using `-vf "ass=temp_subtitles.ass"` (or `-vf "subtitles=temp.srt"` for standard mode).
+
+---
+
+#### 3. API Contract & Frontend UI Updates
+1. **Schema & Types:**
+   - Add `subtitleMode: 'karaoke' | 'standard' | 'none'` to `MediaJobInput` in `lib/api-spec/openapi.yaml`.
+   - Run codegen: `pnpm --filter @workspace/api-spec codegen`.
+2. **Frontend Controls (`artifacts/media-craft-ai/src/App.tsx`):**
+   - Under the subtitle & caption settings, add a toggle/segmented radio group:
+     - 🟡 **Active Word Highlight (Carter PC / TikTok Style)**
+     - ⚪ **Standard Subtitles (Clean White)**
+     - 🚫 **No Subtitles**
+   - Default to **Active Word Highlight** when "Captions & Hook" or "Burn Subtitles" presets are picked.
+   - Keep the generated `.srt` / `.ass` files downloadable in the finished media preview.
+
+---
+
+#### 4. Verification Checklist
+- Run `pnpm run typecheck` and `pnpm run build` across all workspace packages.
+- Test both modes with a sample MP4: verify that Karaoke mode renders the bold active-yellow word animation and Standard mode produces clean subtitles.

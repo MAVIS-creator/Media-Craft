@@ -92,3 +92,57 @@ export async function validateSubtitleFile(filePath: string, originalName: strin
 export function validateGeneratedSrt(text: string, sourceDurationSeconds: number): string {
   return validateText(text, "srt", sourceDurationSeconds);
 }
+
+export type TimedSubtitleWord = { word: string; start: number; end: number };
+
+function assTime(seconds: number): string {
+  const safe = Math.max(0, seconds);
+  const hours = Math.floor(safe / 3600);
+  const minutes = Math.floor((safe % 3600) / 60);
+  const wholeSeconds = Math.floor(safe % 60);
+  const centiseconds = Math.floor((safe - Math.floor(safe)) * 100);
+  return `${hours}:${String(minutes).padStart(2, "0")}:${String(wholeSeconds).padStart(2, "0")}.${String(centiseconds).padStart(2, "0")}`;
+}
+
+function assText(value: string): string {
+  return value.replace(/[{}\r\n]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+export function generateAssWithKaraokeHighlight(words: TimedSubtitleWord[], options?: { playResX?: number; playResY?: number }): string {
+  const safeWords = words
+    .filter((item) => Number.isFinite(item.start) && Number.isFinite(item.end) && item.end > item.start)
+    .map((item) => ({ ...item, word: assText(item.word) }))
+    .filter((item) => item.word)
+    .slice(0, 50_000);
+  const playResX = options?.playResX ?? 1080;
+  const playResY = options?.playResY ?? 1920;
+  const lines = [
+    "[Script Info]",
+    "ScriptType: v4.00+",
+    `PlayResX: ${playResX}`,
+    `PlayResY: ${playResY}`,
+    "",
+    "[V4+ Styles]",
+    "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
+    "Style: CarterPC,Arial Black,48,&H00FFFFFF,&H00FFFF00,&H00000000,&H80000000,-1,0,0,0,100,100,1,0,1,4,2,2,40,40,650,1",
+    "",
+    "[Events]",
+    "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
+  ];
+
+  for (let index = 0; index < safeWords.length; index += 4) {
+    const group = safeWords.slice(index, index + 4);
+    const lineStart = group[0].start;
+    const lineEnd = group[group.length - 1].end;
+    for (const active of group) {
+      const text = group.map((word) => word === active
+        ? `{\\c&H00FFFF&}${word.word}{\\c&HFFFFFF&}`
+        : word.word
+      ).join(" ");
+      lines.push(`Dialogue: 0,${assTime(active.start)},${assTime(active.end)},CarterPC,,0,0,0,,${text}`);
+    }
+    // Keep a short group visible if a provider returns a very small gap.
+    if (lineEnd <= lineStart) continue;
+  }
+  return `${lines.join("\n")}\n`;
+}
