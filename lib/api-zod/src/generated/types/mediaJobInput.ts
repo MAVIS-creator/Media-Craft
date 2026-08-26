@@ -16,4 +16,6 @@ export interface MediaJobInput {
   subtitle?: Blob;
   /** For Captions & Hook, upload a caption file or generate captions from the source audio. */
   subtitleMode?: MediaJobInputSubtitleMode;
+  /** Burn captions into video or return a subtitle file. */
+  subtitleOutput?: 'burn' | 'file';
 }

@@ -251,8 +251,12 @@ components:
           description: Optional SRT or VTT sidecar caption file. Required for burn-subtitles when subtitleMode is upload.
         subtitleMode:
           type: string
-          enum: [upload, generate]
-          description: For burn-subtitles, upload a caption file or generate captions from the source audio.
+          enum: [upload, generate, standard, karaoke, none]
+          description: Caption style. Standard creates clean white captions, karaoke creates an active-yellow ASS file, and none skips captions.
+        subtitleOutput:
+          type: string
+          enum: [burn, file]
+          description: Burn captions into the rendered video or return the generated subtitle file for download.
       required:
         - file
     MediaJob:

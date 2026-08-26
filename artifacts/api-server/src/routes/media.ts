@@ -61,14 +61,17 @@ router.post("/media/jobs", upload.fields([{ name: "file", maxCount: 1 }, { name:
   }
   const preset = requestedPreset ?? "custom";
   const prompt = typeof req.body.prompt === "string" ? req.body.prompt.slice(0, 1000) : "";
-  const requestedSubtitleMode = req.body.subtitleMode === "generate" || req.body.subtitleMode === "upload"
-    ? req.body.subtitleMode
-    : preset === "captions-hook" ? "generate" : null;
+  const requestedSubtitleMode = ["generate", "upload", "standard", "karaoke", "none"].includes(req.body.subtitleMode)
+    ? req.body.subtitleMode as "generate" | "upload" | "standard" | "karaoke" | "none"
+    : preset === "captions-hook" ? "karaoke" : null;
+  const requestedSubtitleOutput = req.body.subtitleOutput === "file" || req.body.subtitleOutput === "burn"
+    ? req.body.subtitleOutput
+    : preset === "captions-hook" ? "burn" : null;
   if (subtitle && preset !== "burn-subtitles" && preset !== "captions-hook") {
     res.status(400).json({ error: "A subtitle file can only be used with Captions & Hook." });
     return;
   }
-  if ((preset === "burn-subtitles" || preset === "captions-hook") && !subtitle && requestedSubtitleMode !== "generate") {
+  if ((preset === "burn-subtitles" || preset === "captions-hook") && requestedSubtitleMode !== "none" && !subtitle && requestedSubtitleMode !== "generate" && requestedSubtitleMode !== "karaoke") {
     res.status(400).json({ error: "Attach an SRT/VTT caption file or choose Generate Captions from Audio." });
     return;
   }
@@ -116,6 +119,7 @@ router.post("/media/jobs", upload.fields([{ name: "file", maxCount: 1 }, { name:
     mediaInfo,
     subtitlePath,
     subtitleMode: subtitlePath ? "upload" : requestedSubtitleMode,
+    subtitleOutput: requestedSubtitleOutput,
   });
 
   res.status(202).json(CreateMediaJobResponse.parse(publicJob(job)));

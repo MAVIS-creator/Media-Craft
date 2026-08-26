@@ -33,6 +33,9 @@ export type MediaJobInputSubtitleMode = typeof MediaJobInputSubtitleMode[keyof t
 export const MediaJobInputSubtitleMode = {
   upload: 'upload',
   generate: 'generate',
+  standard: 'standard',
+  karaoke: 'karaoke',
+  none: 'none',
 } as const;
 
 export interface MediaJobInput {
@@ -43,6 +46,8 @@ export interface MediaJobInput {
   subtitle?: Blob;
   /** For Captions & Hook, upload a caption file or generate captions from the source audio. */
   subtitleMode?: MediaJobInputSubtitleMode;
+  /** Burn captions into video or return a subtitle file. */
+  subtitleOutput?: 'burn' | 'file';
 }
 
 export type MediaJobStatus = typeof MediaJobStatus[keyof typeof MediaJobStatus];

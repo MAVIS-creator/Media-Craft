@@ -140,9 +140,12 @@ function deterministicPresetArgs(job: MediaJob, outputPath: string, subtitlePath
     case "captions-hook":
       if (!job.mediaInfo.hasVideo) throw new Error("Captions & Hook requires a video source.");
       if (!subtitlePath) throw new Error("Captions & Hook needs generated or uploaded captions.");
+      const captionFilter = subtitlePath.endsWith(".ass") ? "ass" : "subtitles";
       return [
         "-y", "-i", input,
-        "-vf", `subtitles='${escapeSubtitleFilterPath(subtitlePath)}':force_style='FontName=Arial,FontSize=28,Bold=1,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,Outline=3,Shadow=1,Alignment=2,MarginV=70'`,
+        "-vf", captionFilter === "ass"
+          ? `ass='${escapeSubtitleFilterPath(subtitlePath)}'`
+          : `subtitles='${escapeSubtitleFilterPath(subtitlePath)}':force_style='FontName=Arial,FontSize=28,Bold=1,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,Outline=3,Shadow=1,Alignment=2,MarginV=70'`,
         "-map", "0:v:0", "-map", "0:a?",
         "-c:v", "libx264", "-preset", "medium", "-crf", "20",
         "-c:a", "aac", "-b:a", "192k", "-af", "loudnorm=I=-14:TP=-1.5:LRA=11",
@@ -475,7 +478,7 @@ async function processJob(id: string): Promise<void> {
   try {
     if (
       job.preset === "generate-subtitles" ||
-      (job.preset === "captions-hook" && job.subtitleMode !== "none" && job.subtitleOutput !== "file") ||
+      (job.preset === "captions-hook" && job.subtitleMode !== "none") ||
       (job.preset === "burn-subtitles" && job.subtitleMode === "generate")
     ) {
       await createGeneratedSubtitle(job, directory);

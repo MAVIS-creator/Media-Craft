@@ -889,12 +889,16 @@ function Dropzone({
 function CaptionSourcePicker({
   subtitleFile,
   mode,
+  output,
   onMode,
+  onOutput,
   onFile,
 }: {
   subtitleFile: File | null;
-  mode: 'upload' | 'generate';
-  onMode: (mode: 'upload' | 'generate') => void;
+  mode: 'standard' | 'karaoke' | 'none';
+  output: 'burn' | 'file';
+  onMode: (mode: 'standard' | 'karaoke' | 'none') => void;
+  onOutput: (output: 'burn' | 'file') => void;
   onFile: (file: File | null) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -907,42 +911,52 @@ function CaptionSourcePicker({
         <div className="min-w-0 flex-1">
           <div className="text-[12px] font-bold text-white">Caption source</div>
           <p className="mt-0.5 text-[10px] leading-relaxed text-slate-400">
-            Generate a timed SRT from the source audio, or burn a caption file you already have.
+            Choose a normal subtitle file, an active-yellow karaoke file, or burn captions directly into the video.
           </p>
         </div>
       </div>
-      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+      <div className="mt-3 grid gap-2 sm:grid-cols-3">
         <button
           type="button"
-          onClick={() => onMode('generate')}
-          className={`rounded-xl border p-3 text-left transition-colors ${mode === 'generate' ? 'border-violet-400 bg-violet-900/50' : 'border-slate-700 bg-slate-950 hover:border-slate-600'}`}
+          onClick={() => onMode('karaoke')}
+          className={`rounded-xl border p-3 text-left transition-colors ${mode === 'karaoke' ? 'border-yellow-400 bg-yellow-950/40' : 'border-slate-700 bg-slate-950 hover:border-slate-600'}`}
         >
           <div className="flex items-center gap-2 text-[11px] font-bold text-white">
-            {mode === 'generate' && <Check size={13} className="text-violet-300" />}
-            Generate from video audio
+            {mode === 'karaoke' && <Check size={13} className="text-yellow-300" />}
+            Active word highlight
           </div>
-          <p className="mt-1 text-[10px] leading-relaxed text-slate-400">Extract audio, transcribe it, validate captions, then burn them.</p>
+          <p className="mt-1 text-[10px] leading-relaxed text-slate-400">Carter PC style, white words with a yellow spoken word.</p>
         </button>
         <button
           type="button"
-          onClick={() => onMode('upload')}
-          className={`rounded-xl border p-3 text-left transition-colors ${mode === 'upload' ? 'border-violet-400 bg-violet-900/50' : 'border-slate-700 bg-slate-950 hover:border-slate-600'}`}
+          onClick={() => onMode('standard')}
+          className={`rounded-xl border p-3 text-left transition-colors ${mode === 'standard' ? 'border-violet-400 bg-violet-900/50' : 'border-slate-700 bg-slate-950 hover:border-slate-600'}`}
         >
           <div className="flex items-center gap-2 text-[11px] font-bold text-white">
-            {mode === 'upload' && <Check size={13} className="text-violet-300" />}
-            Upload SRT or VTT
+            {mode === 'standard' && <Check size={13} className="text-violet-300" />}
+            Standard subtitles
           </div>
-          <p className="mt-1 text-[10px] leading-relaxed text-slate-400">Burn a manually authored, UTF-8 caption sidecar into the video.</p>
+          <p className="mt-1 text-[10px] leading-relaxed text-slate-400">Clean white timed SRT, without karaoke highlighting.</p>
+        </button>
+        <button type="button" onClick={() => onMode('none')} className={`rounded-xl border p-3 text-left transition-colors ${mode === 'none' ? 'border-slate-400 bg-slate-800' : 'border-slate-700 bg-slate-950 hover:border-slate-600'}`}>
+          <div className="flex items-center gap-2 text-[11px] font-bold text-white">{mode === 'none' && <Check size={13} />}No subtitles</div>
+          <p className="mt-1 text-[10px] leading-relaxed text-slate-400">Finish the video without adding a caption layer.</p>
         </button>
       </div>
-      {mode === 'upload' && (
+      {mode !== 'none' && (
+        <>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button type="button" onClick={() => onOutput('burn')} className={`rounded-xl border p-2.5 text-left text-[10px] font-bold ${output === 'burn' ? 'border-blue-400 bg-blue-950/50 text-white' : 'border-slate-700 text-slate-400'}`}>Burn into video</button>
+          <button type="button" onClick={() => onOutput('file')} className={`rounded-xl border p-2.5 text-left text-[10px] font-bold ${output === 'file' ? 'border-blue-400 bg-blue-950/50 text-white' : 'border-slate-700 text-slate-400'}`}>Download subtitle file</button>
+        </div>
+        {output === 'burn' && (
         <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5">
           <input
             ref={inputRef}
             className="hidden"
             type="file"
             accept=".srt,.vtt,text/vtt,application/x-subrip"
-            onChange={(event) => onFile(event.target.files?.[0] ?? null)}
+             onChange={(event) => onFile(event.target.files?.[0] ?? null)}
           />
           <div className="min-w-0">
             <div className="truncate text-[11px] font-semibold text-slate-200">{subtitleFile?.name ?? 'No caption file selected'}</div>
@@ -956,6 +970,8 @@ function CaptionSourcePicker({
             {subtitleFile ? 'Replace' : 'Choose file'}
           </button>
         </div>
+        )}
+        </>
       )}
     </div>
   );
@@ -1801,7 +1817,8 @@ function StudioApp() {
   const [commandOpen, setCommandOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [subtitleFile, setSubtitleFile] = useState<File | null>(null);
-  const [subtitleMode, setSubtitleMode] = useState<'upload' | 'generate'>('generate');
+  const [subtitleMode, setSubtitleMode] = useState<'standard' | 'karaoke' | 'none'>('karaoke');
+  const [subtitleOutput, setSubtitleOutput] = useState<'burn' | 'file'>('burn');
   const [preset, setPreset] = useState<Preset>('smart-reframe');
   const [prompt, setPrompt] = useState('');
   const [jobId, setJobId] = useState('');
@@ -1886,8 +1903,8 @@ function StudioApp() {
       setNotice('Select or drop a source media file first.');
       return;
     }
-    if (preset === 'captions-hook' && subtitleMode === 'upload' && !subtitleFile) {
-      setNotice('Choose an SRT or VTT file, or switch to Generate from video audio.');
+    if (preset === 'captions-hook' && subtitleOutput === 'burn' && subtitleMode === 'standard' && subtitleFile === null) {
+      setNotice('Choose an SRT or VTT file, or switch to generated karaoke captions.');
       return;
     }
     setNotice('');
@@ -1898,7 +1915,7 @@ function StudioApp() {
           preset,
           prompt: prompt.trim() || undefined,
           ...(preset === 'captions-hook'
-            ? { subtitleMode, subtitle: subtitleMode === 'upload' ? subtitleFile ?? undefined : undefined }
+            ? { subtitleMode, subtitleOutput, subtitle: subtitleFile ?? undefined }
             : {}),
         },
       },
@@ -1919,7 +1936,8 @@ function StudioApp() {
   const reset = () => {
     setFile(null);
     setSubtitleFile(null);
-    setSubtitleMode('generate');
+    setSubtitleMode('karaoke');
+    setSubtitleOutput('burn');
     setPrompt('');
     setJobId('');
     setNotice('');
@@ -2030,10 +2048,12 @@ function StudioApp() {
                         <CaptionSourcePicker
                           subtitleFile={subtitleFile}
                           mode={subtitleMode}
+                          output={subtitleOutput}
                           onMode={(mode) => {
                             setSubtitleMode(mode);
-                            if (mode === 'generate') setSubtitleFile(null);
+                            if (mode !== 'standard') setSubtitleFile(null);
                           }}
+                          onOutput={setSubtitleOutput}
                           onFile={setSubtitleFile}
                         />
                       </div>

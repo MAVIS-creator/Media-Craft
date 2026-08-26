@@ -22,6 +22,29 @@ function sleep(milliseconds: number) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
+function deriveWordTimings(srt: string): Array<{ word: string; start: number; end: number }> {
+  const timestamp = /(\d{2}):(\d{2}):(\d{2})[,.](\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2})[,.](\d{3})/g;
+  const cues = [...srt.matchAll(timestamp)];
+  return cues.flatMap((cue, index) => {
+    const bodyStart = (cue.index ?? 0) + cue[0].length;
+    const bodyEnd = cues[index + 1]?.index ?? srt.length;
+    const words = srt.slice(bodyStart, bodyEnd)
+      .replace(/^\s*\d+\s*/m, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .split(" ")
+      .filter(Boolean);
+    const start = (((Number(cue[1]) * 60 + Number(cue[2])) * 60 + Number(cue[3])) + Number(cue[4]) / 1000);
+    const end = (((Number(cue[5]) * 60 + Number(cue[6])) * 60 + Number(cue[7])) + Number(cue[8]) / 1000);
+    const step = (end - start) / Math.max(words.length, 1);
+    return words.map((word, wordIndex) => ({
+      word,
+      start: start + step * wordIndex,
+      end: wordIndex === words.length - 1 ? end : start + step * (wordIndex + 1),
+    }));
+  });
+}
+
 export async function generateCaptionBundleFromAudio(input: {
   audioPath: string;
   durationSeconds: number;
@@ -63,13 +86,17 @@ export async function generateCaptionBundleFromAudio(input: {
               },
             },
             {
-              text: `Transcribe this audio into accurate, timed subtitles and word-level timestamps.
+              text: `You are a professional dialogue transcription and subtitle editor. Transcribe the attached audio exactly.
 
 The source duration is approximately ${input.durationSeconds.toFixed(2)} seconds.
-Use the spoken language from the audio. Preserve meaning and natural punctuation.
-Create sequential SRT cues with HH:MM:SS,mmm --> HH:MM:SS,mmm timestamps.
-Also return a words array with one entry per spoken word and precise start/end offsets in seconds.
-Never invent speech, instructions, speaker labels, or a summary.
+1. Detect the spoken language and keep that language. Never translate, paraphrase, summarize, or add words.
+2. Include only audible spoken dialogue. Do not invent speech from context. Omit long silence, music, and sound effects.
+3. Preserve names, numbers, slang, contractions, and meaningful repeated words. Use natural punctuation and capitalization.
+4. Create readable sequential SRT cues: normally 2–7 words per cue, 1–42 characters per line, and roughly 0.8–5 seconds per cue. Split at natural phrase boundaries, not arbitrarily.
+5. Align every cue closely to the actual speech. Do not overlap cues, do not use negative times, and keep all ends within the source duration.
+6. Return a words array containing every spoken word in the same order as the SRT text. Each word must have precise start/end offsets in seconds and must fit inside its parent spoken phrase.
+7. Do not include speaker labels, markdown, commentary, or a transcript outside the JSON object.
+
 Return JSON only in exactly this shape: {"srt":"1\\n00:00:00,000 --> 00:00:02,000\\nCaption text\\n","words":[{"word":"Caption","start":0,"end":0.6}]}.`,
             },
           ],
@@ -77,6 +104,8 @@ Return JSON only in exactly this shape: {"srt":"1\\n00:00:00,000 --> 00:00:02,00
       ],
       config: {
         responseMimeType: "application/json",
+        temperature: 0.1,
+        topP: 0.9,
         maxOutputTokens: 8192,
       },
     };
@@ -112,9 +141,10 @@ Return JSON only in exactly this shape: {"srt":"1\\n00:00:00,000 --> 00:00:02,00
     const words = (parsed.data.words ?? []).filter((word) =>
       word.word.trim() && word.end > word.start && word.start <= input.durationSeconds + 2 && word.end <= input.durationSeconds + 2
     );
+    const validatedSrt = parsed.data.srt.replace(/\r\n/g, "\n").trim();
     return {
-      srt: parsed.data.srt.replace(/\r\n/g, "\n").trim(),
-      words,
+      srt: validatedSrt,
+      words: words.length ? words : deriveWordTimings(validatedSrt),
     };
   } finally {
     if (uploadedName) {

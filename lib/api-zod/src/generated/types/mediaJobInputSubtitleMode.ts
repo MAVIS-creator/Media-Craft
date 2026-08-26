@@ -15,4 +15,7 @@ export type MediaJobInputSubtitleMode = typeof MediaJobInputSubtitleMode[keyof t
 export const MediaJobInputSubtitleMode = {
   upload: 'upload',
   generate: 'generate',
+  standard: 'standard',
+  karaoke: 'karaoke',
+  none: 'none',
 } as const;
