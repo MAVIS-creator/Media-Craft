@@ -890,15 +890,19 @@ function CaptionSourcePicker({
   subtitleFile,
   mode,
   output,
+  sourceMode,
   onMode,
   onOutput,
+  onSourceMode,
   onFile,
 }: {
   subtitleFile: File | null;
    mode: 'standard' | 'karaoke';
   output: 'burn' | 'file';
+  sourceMode: 'upload' | 'generate';
    onMode: (mode: 'standard' | 'karaoke') => void;
   onOutput: (output: 'burn' | 'file') => void;
+  onSourceMode: (mode: 'upload' | 'generate') => void;
   onFile: (file: File | null) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -940,12 +944,30 @@ function CaptionSourcePicker({
         </button>
       </div>
       <div className="mt-3 rounded-xl border border-blue-900/70 bg-blue-950/20 p-3">
-        <div className="mb-2 font-mono text-[9px] uppercase tracking-wider text-blue-300">What should MediaCraft return?</div>
+        <div className="mb-2 font-mono text-[9px] uppercase tracking-wider text-blue-300">
+          {mode === 'standard' ? 'Standard subtitle action' : 'Karaoke subtitle action'}
+        </div>
         <div className="mt-3 grid grid-cols-2 gap-2">
-          <button type="button" onClick={() => onOutput('burn')} className={`rounded-xl border p-2.5 text-left text-[10px] font-bold ${output === 'burn' ? 'border-blue-400 bg-blue-950/50 text-white' : 'border-slate-700 text-slate-400'}`}>Burn into video</button>
-          <button type="button" onClick={() => onOutput('file')} className={`rounded-xl border p-2.5 text-left text-[10px] font-bold ${output === 'file' ? 'border-blue-400 bg-blue-950/50 text-white' : 'border-slate-700 text-slate-400'}`}>Download subtitle file</button>
+          <button type="button" onClick={() => onOutput('burn')} className={`rounded-xl border p-2.5 text-left text-[10px] font-bold ${output === 'burn' ? 'border-blue-400 bg-blue-950/50 text-white' : 'border-slate-700 text-slate-400'}`}>
+            {mode === 'standard' ? 'Burn subtitles into video' : 'Burn karaoke into video'}
+          </button>
+          <button type="button" onClick={() => onOutput('file')} className={`rounded-xl border p-2.5 text-left text-[10px] font-bold ${output === 'file' ? 'border-blue-400 bg-blue-950/50 text-white' : 'border-slate-700 text-slate-400'}`}>
+            {mode === 'standard' ? 'Generate subtitle file only' : 'Download karaoke file'}
+          </button>
         </div>
         {output === 'burn' && mode === 'standard' && (
+          <>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <button type="button" onClick={() => onSourceMode('generate')} className={`rounded-xl border p-3 text-left ${sourceMode === 'generate' ? 'border-violet-400 bg-violet-900/50' : 'border-slate-700 bg-slate-950'}`}>
+              <div className="text-[11px] font-bold text-white">{sourceMode === 'generate' && <Check size={13} className="mr-1 inline text-violet-300" />}Generate from video audio</div>
+              <p className="mt-1 text-[10px] leading-relaxed text-slate-400">MediaCraft transcribes the source and burns the generated captions.</p>
+            </button>
+            <button type="button" onClick={() => onSourceMode('upload')} className={`rounded-xl border p-3 text-left ${sourceMode === 'upload' ? 'border-violet-400 bg-violet-900/50' : 'border-slate-700 bg-slate-950'}`}>
+              <div className="text-[11px] font-bold text-white">{sourceMode === 'upload' && <Check size={13} className="mr-1 inline text-violet-300" />}Use my subtitle file</div>
+              <p className="mt-1 text-[10px] leading-relaxed text-slate-400">Burn an existing UTF-8 SRT or VTT file.</p>
+            </button>
+          </div>
+          {sourceMode === 'upload' && (
         <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5">
           <input
             ref={inputRef}
@@ -967,6 +989,7 @@ function CaptionSourcePicker({
           </button>
         </div>
         )}
+          </>
         {output === 'file' && (
           <p className="mt-2 text-[10px] leading-relaxed text-slate-400">
             {mode === 'karaoke'
@@ -1801,6 +1824,8 @@ function JobListPanel({
               Upload a source in the workspace to see it processed here.
             </p>
           </div>
+          )}
+          </>
         )}
       </div>
     </section>
@@ -1821,6 +1846,7 @@ function StudioApp() {
   const [subtitleFile, setSubtitleFile] = useState<File | null>(null);
   const [subtitleMode, setSubtitleMode] = useState<'standard' | 'karaoke'>('karaoke');
   const [subtitleOutput, setSubtitleOutput] = useState<'burn' | 'file'>('burn');
+  const [subtitleSourceMode, setSubtitleSourceMode] = useState<'upload' | 'generate'>('generate');
   const [preset, setPreset] = useState<Preset>('smart-reframe');
   const [prompt, setPrompt] = useState('');
   const [jobId, setJobId] = useState('');
@@ -1905,7 +1931,7 @@ function StudioApp() {
       setNotice('Select or drop a source media file first.');
       return;
     }
-    if (preset === 'captions-hook' && subtitleOutput === 'burn' && subtitleMode === 'standard' && subtitleFile === null) {
+    if (preset === 'captions-hook' && subtitleOutput === 'burn' && subtitleMode === 'standard' && subtitleSourceMode === 'upload' && subtitleFile === null) {
       setNotice('Choose an SRT or VTT file, or switch to generated karaoke captions.');
       return;
     }
@@ -1917,7 +1943,7 @@ function StudioApp() {
           preset,
           prompt: prompt.trim() || undefined,
           ...(preset === 'captions-hook'
-            ? { subtitleMode, subtitleOutput, subtitle: subtitleFile ?? undefined }
+            ? { subtitleMode, subtitleOutput, subtitle: subtitleSourceMode === 'upload' ? subtitleFile ?? undefined : undefined }
             : {}),
         },
       },
@@ -1940,6 +1966,7 @@ function StudioApp() {
     setSubtitleFile(null);
     setSubtitleMode('karaoke');
     setSubtitleOutput('burn');
+    setSubtitleSourceMode('generate');
     setPrompt('');
     setJobId('');
     setNotice('');
@@ -2051,11 +2078,16 @@ function StudioApp() {
                           subtitleFile={subtitleFile}
                           mode={subtitleMode}
                           output={subtitleOutput}
+                          sourceMode={subtitleSourceMode}
                           onMode={(mode) => {
                             setSubtitleMode(mode);
                             if (mode !== 'standard') setSubtitleFile(null);
                           }}
                           onOutput={setSubtitleOutput}
+                          onSourceMode={(mode) => {
+                            setSubtitleSourceMode(mode);
+                            if (mode === 'generate') setSubtitleFile(null);
+                          }}
                           onFile={setSubtitleFile}
                         />
                       </div>
