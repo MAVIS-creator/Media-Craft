@@ -990,6 +990,7 @@ function CaptionSourcePicker({
         </div>
         )}
           </>
+        )}
         {output === 'file' && (
           <p className="mt-2 text-[10px] leading-relaxed text-slate-400">
             {mode === 'karaoke'
@@ -1825,8 +1826,6 @@ function JobListPanel({
             </p>
           </div>
           )}
-          </>
-        )}
       </div>
     </section>
   );
