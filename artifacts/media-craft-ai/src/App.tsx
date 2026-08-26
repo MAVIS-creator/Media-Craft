@@ -895,9 +895,9 @@ function CaptionSourcePicker({
   onFile,
 }: {
   subtitleFile: File | null;
-  mode: 'standard' | 'karaoke' | 'none';
+   mode: 'standard' | 'karaoke';
   output: 'burn' | 'file';
-  onMode: (mode: 'standard' | 'karaoke' | 'none') => void;
+   onMode: (mode: 'standard' | 'karaoke') => void;
   onOutput: (output: 'burn' | 'file') => void;
   onFile: (file: File | null) => void;
 }) {
@@ -911,7 +911,7 @@ function CaptionSourcePicker({
         <div className="min-w-0 flex-1">
           <div className="text-[12px] font-bold text-white">Caption source</div>
           <p className="mt-0.5 text-[10px] leading-relaxed text-slate-400">
-            Choose a normal subtitle file, an active-yellow karaoke file, or burn captions directly into the video.
+            First choose the caption style, then choose whether to burn it into the video or download it as a subtitle file.
           </p>
         </div>
       </div>
@@ -923,9 +923,9 @@ function CaptionSourcePicker({
         >
           <div className="flex items-center gap-2 text-[11px] font-bold text-white">
             {mode === 'karaoke' && <Check size={13} className="text-yellow-300" />}
-            Active word highlight
+            Karaoke / active word
           </div>
-          <p className="mt-1 text-[10px] leading-relaxed text-slate-400">Carter PC style, white words with a yellow spoken word.</p>
+          <p className="mt-1 text-[10px] leading-relaxed text-slate-400">Words appear in bold white, with the word being spoken highlighted yellow.</p>
         </button>
         <button
           type="button"
@@ -936,15 +936,11 @@ function CaptionSourcePicker({
             {mode === 'standard' && <Check size={13} className="text-violet-300" />}
             Standard subtitles
           </div>
-          <p className="mt-1 text-[10px] leading-relaxed text-slate-400">Clean white timed SRT, without karaoke highlighting.</p>
-        </button>
-        <button type="button" onClick={() => onMode('none')} className={`rounded-xl border p-3 text-left transition-colors ${mode === 'none' ? 'border-slate-400 bg-slate-800' : 'border-slate-700 bg-slate-950 hover:border-slate-600'}`}>
-          <div className="flex items-center gap-2 text-[11px] font-bold text-white">{mode === 'none' && <Check size={13} />}No subtitles</div>
-          <p className="mt-1 text-[10px] leading-relaxed text-slate-400">Finish the video without adding a caption layer.</p>
+          <p className="mt-1 text-[10px] leading-relaxed text-slate-400">A normal clean white subtitle file, with no word-by-word color change.</p>
         </button>
       </div>
-      {mode !== 'none' && (
-        <>
+      <div className="mt-3 rounded-xl border border-blue-900/70 bg-blue-950/20 p-3">
+        <div className="mb-2 font-mono text-[9px] uppercase tracking-wider text-blue-300">What should MediaCraft return?</div>
         <div className="mt-3 grid grid-cols-2 gap-2">
           <button type="button" onClick={() => onOutput('burn')} className={`rounded-xl border p-2.5 text-left text-[10px] font-bold ${output === 'burn' ? 'border-blue-400 bg-blue-950/50 text-white' : 'border-slate-700 text-slate-400'}`}>Burn into video</button>
           <button type="button" onClick={() => onOutput('file')} className={`rounded-xl border p-2.5 text-left text-[10px] font-bold ${output === 'file' ? 'border-blue-400 bg-blue-950/50 text-white' : 'border-slate-700 text-slate-400'}`}>Download subtitle file</button>
@@ -971,8 +967,14 @@ function CaptionSourcePicker({
           </button>
         </div>
         )}
-        </>
-      )}
+        {output === 'file' && (
+          <p className="mt-2 text-[10px] leading-relaxed text-slate-400">
+            {mode === 'karaoke'
+              ? 'Downloads an .ASS karaoke file with active-word timing. You can burn it later in an editor.'
+              : 'Downloads a normal .SRT subtitle file. The video itself is not changed.'}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
