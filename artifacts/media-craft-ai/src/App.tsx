@@ -945,7 +945,7 @@ function CaptionSourcePicker({
           <button type="button" onClick={() => onOutput('burn')} className={`rounded-xl border p-2.5 text-left text-[10px] font-bold ${output === 'burn' ? 'border-blue-400 bg-blue-950/50 text-white' : 'border-slate-700 text-slate-400'}`}>Burn into video</button>
           <button type="button" onClick={() => onOutput('file')} className={`rounded-xl border p-2.5 text-left text-[10px] font-bold ${output === 'file' ? 'border-blue-400 bg-blue-950/50 text-white' : 'border-slate-700 text-slate-400'}`}>Download subtitle file</button>
         </div>
-        {output === 'burn' && (
+        {output === 'burn' && mode === 'standard' && (
         <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5">
           <input
             ref={inputRef}
@@ -1819,7 +1819,7 @@ function StudioApp() {
   const [commandOpen, setCommandOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [subtitleFile, setSubtitleFile] = useState<File | null>(null);
-  const [subtitleMode, setSubtitleMode] = useState<'standard' | 'karaoke' | 'none'>('karaoke');
+  const [subtitleMode, setSubtitleMode] = useState<'standard' | 'karaoke'>('karaoke');
   const [subtitleOutput, setSubtitleOutput] = useState<'burn' | 'file'>('burn');
   const [preset, setPreset] = useState<Preset>('smart-reframe');
   const [prompt, setPrompt] = useState('');
