@@ -61,6 +61,9 @@
   --font-display: 'Space Grotesk', sans-serif;
   --elevate-1: rgba(33, 45, 83, 0.04);
   --elevate-2: rgba(33, 45, 83, 0.08);
+  --scrollbar-track: #e2e8f0;
+  --scrollbar-thumb: linear-gradient(180deg, #2563eb, #6366f1);
+  --scrollbar-thumb-hover: linear-gradient(180deg, #1d4ed8, #4f46e5);
 }
 
 .dark {
@@ -84,10 +87,17 @@
   --accent-foreground: 225 31% 12%;
   --destructive: 7 72% 61%;
   --destructive-foreground: 225 31% 12%;
+  --scrollbar-track: #111827;
+  --scrollbar-thumb: linear-gradient(180deg, #3b82f6, #6366f1);
+  --scrollbar-thumb-hover: linear-gradient(180deg, #60a5fa, #818cf8);
 }
 
 @layer base {
-  * { @apply border-border; }
+  * {
+    @apply border-border;
+    scrollbar-width: thin;
+    scrollbar-color: #4f6fdc transparent;
+  }
   html, body, #root { min-height: 100%; }
   html { background: hsl(var(--background)); }
   body { @apply font-sans antialiased bg-background text-foreground; margin: 0; overflow: hidden; }
@@ -101,6 +111,18 @@
 .studio-shell { height: 100dvh; min-height: 0; overflow: hidden; }
 .studio-main { min-height: 0; overflow: hidden; }
 .studio-content { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+
+/* MediaCraft scroll chrome: shared by vertical and horizontal scroll areas. */
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+*::-webkit-scrollbar-thumb {
+  min-height: 40px;
+  border: 2px solid var(--scrollbar-track);
+  border-radius: 999px;
+  background: var(--scrollbar-thumb);
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+*::-webkit-scrollbar-corner { background: var(--scrollbar-track); }
 
 @layer utilities {
   .font-display { font-family: var(--font-display); }
@@ -290,3 +312,34 @@ body.theme-light .settings-modal {
   border-color: #dbe3ef !important;
 }
 .settings-modal { scrollbar-color: #64748b transparent; }
+
+/* Tour surfaces are intentionally theme-independent so the spotlight and copy
+   retain judging-safe contrast in both light and dark modes. */
+body.theme-light .app-tour-card,
+body.theme-dark .app-tour-card {
+  background: #101827 !important;
+  border-color: rgba(96, 165, 250, .75) !important;
+  color: #e2e8f0 !important;
+}
+body.theme-light .grain .app-tour-card,
+body.theme-dark .grain .app-tour-card {
+  background: #101827 !important;
+  border-color: rgba(96, 165, 250, .75) !important;
+  color: #e2e8f0 !important;
+}
+body.theme-light .app-tour-card [class*="text-white"],
+body.theme-dark .app-tour-card [class*="text-white"] { color: #fff !important; }
+body.theme-light .app-tour-card [class*="text-slate-300"],
+body.theme-dark .app-tour-card [class*="text-slate-300"] { color: #cbd5e1 !important; }
+body.theme-light .app-tour-card [class*="text-slate-400"],
+body.theme-dark .app-tour-card [class*="text-slate-400"] { color: #94a3b8 !important; }
+body.theme-light .grain .app-tour-card [class*="text-white"],
+body.theme-dark .grain .app-tour-card [class*="text-white"] { color: #fff !important; }
+body.theme-light .grain .app-tour-card [class*="text-slate-300"],
+body.theme-dark .grain .app-tour-card [class*="text-slate-300"] { color: #cbd5e1 !important; }
+body.theme-light .grain .app-tour-card [class*="text-slate-400"],
+body.theme-dark .grain .app-tour-card [class*="text-slate-400"] { color: #94a3b8 !important; }
+body.theme-light .app-tour-card .bg-blue-600,
+body.theme-dark .app-tour-card .bg-blue-600 { background: #2563eb !important; color: #fff !important; }
+body.theme-light .grain .app-tour-card .bg-blue-600,
+body.theme-dark .grain .app-tour-card .bg-blue-600 { background: #2563eb !important; color: #fff !important; }

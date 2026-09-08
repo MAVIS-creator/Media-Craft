@@ -267,11 +267,14 @@ function AppTour({
     : { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
 
   return (
-    <div className="fixed inset-0 z-[120]" role="dialog" aria-modal="true" aria-labelledby="tour-title">
-      <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-[1px]" onClick={onClose} />
+    <div className="app-tour fixed inset-0 z-[120]" role="dialog" aria-modal="true" aria-labelledby="tour-title">
+      <div
+        className={`absolute inset-0 ${targetRect ? 'bg-transparent' : 'bg-slate-950/60 backdrop-blur-[1px]'}`}
+        onClick={onClose}
+      />
       {targetRect && (
         <div
-          className="pointer-events-none fixed rounded-2xl border-2 border-blue-400 shadow-[0_0_0_9999px_rgba(2,6,23,.62),0_0_30px_rgba(96,165,250,.45)] transition-all duration-300"
+          className="app-tour-spotlight pointer-events-none fixed rounded-2xl border-2 border-blue-400 shadow-[0_0_0_9999px_rgba(2,6,23,.68),0_0_30px_rgba(96,165,250,.45)] transition-all duration-300"
           style={{
             top: targetRect.top - 7,
             left: targetRect.left - 7,
@@ -281,7 +284,7 @@ function AppTour({
         />
       )}
       <section
-        className="absolute w-[min(320px,calc(100vw-32px))] rounded-2xl border border-blue-500/60 bg-slate-900 p-5 text-slate-100 shadow-2xl animate-rise"
+        className="app-tour-card absolute z-10 w-[min(320px,calc(100vw-32px))] rounded-2xl border border-blue-500/60 bg-slate-900 p-5 text-slate-100 shadow-2xl animate-rise"
         style={cardStyle}
       >
         <div className="flex items-start justify-between gap-3">
