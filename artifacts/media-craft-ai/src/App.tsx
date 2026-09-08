@@ -485,6 +485,9 @@ function SettingsPanel({
                 </div>
               )}
             </div>
+            <p className="mt-3 text-[10px] leading-relaxed text-slate-500">
+              ClickHouse and Grafana are optional observability services. If either is unavailable, uploads and FFmpeg processing continue locally in this session.
+            </p>
           </div>
         </div>
 

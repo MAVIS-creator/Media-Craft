@@ -37,7 +37,16 @@ function grafanaUrl(path: string): string | null {
 }
 
 function safeError(error: unknown): string {
-  return (error instanceof Error ? error.message : String(error)).replace(/Bearer\s+\S+/gi, "Bearer [redacted]").slice(0, 180);
+  const message = (error instanceof Error ? error.message : String(error))
+    .replace(/Bearer\s+\S+/gi, "Bearer [redacted]")
+    .slice(0, 180);
+  if (message.includes("Grafana returned HTTP 503")) {
+    return "Grafana is unavailable; media processing continues without telemetry.";
+  }
+  if (message.includes("Grafana returned HTTP 401") || message.includes("Grafana returned HTTP 403")) {
+    return "Grafana rejected the telemetry credentials; media processing continues without telemetry.";
+  }
+  return message;
 }
 
 async function grafanaRequest(path: string, init: RequestInit = {}): Promise<Response> {

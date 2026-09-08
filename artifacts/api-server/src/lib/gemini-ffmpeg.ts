@@ -11,6 +11,17 @@ const inputPlaceholder = "__INPUT__";
 const outputPlaceholder = "__OUTPUT__";
 type OutputKind = "audio" | "video";
 
+function containsUnsafePathOrProtocol(arg: string): boolean {
+  if (arg.includes("://")) return true;
+  if (/^(?:\/|\\|[A-Za-z]:[\\/])/.test(arg)) return true;
+  if (/(?:^|[=,:])(?:\.{1,2}[\\/])/.test(arg)) return true;
+  if (/(?:^|[=,:])(?:file|http|https|pipe|tcp|udp):/i.test(arg)) return true;
+
+  // These filters can open another file from inside FFmpeg. Generated plans
+  // must stay single-input and server-owned, so they are not allowed here.
+  return /(?:^|[;,])(?:movie|amovie|subtitles|ass|drawtext|fontfile|textfile)=/i.test(arg);
+}
+
 function requireApiKey(): string {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -52,10 +63,10 @@ function parseResponse(text: string | undefined, outputKind: OutputKind): string
     args.some(
       (arg) =>
         forbiddenToken.test(arg) ||
-        (arg.includes("/") && !arg.includes(inputPlaceholder) && !arg.includes(outputPlaceholder)),
+        (arg !== inputPlaceholder && arg !== outputPlaceholder && containsUnsafePathOrProtocol(arg)),
     )
   ) {
-    throw new Error("Gemini returned an unsafe FFmpeg argument.");
+    throw new Error("Gemini returned an unsafe FFmpeg argument (shell syntax, external protocol, or file path).");
   }
 
   if (outputKind === "audio") {
@@ -93,6 +104,7 @@ Return JSON only in exactly this shape: {"args":["-y","-i","__INPUT__","...","__
 The array will be passed directly to spawn("ffmpeg", args), never through a shell.
 Use exactly one "-i" followed by "__INPUT__". The final array item must be "__OUTPUT__".
 Do not include executable names, shell syntax, absolute paths, relative paths, URLs, or extra input files.
+FFmpeg filter expressions may use "/" for arithmetic, such as "scale=ih*9/16"; do not treat numeric division as a file path.
 Use conservative, widely available FFmpeg codecs and filters. Preserve audio when the instruction asks for video.
 The input filename is only context: ${input.filename}
 Target output kind: ${input.outputKind}.
