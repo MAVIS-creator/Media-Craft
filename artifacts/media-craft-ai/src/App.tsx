@@ -1882,6 +1882,15 @@ function StudioApp() {
   );
 
   useEffect(() => {
+    const status = (jobQuery.error as { status?: number } | null)?.status;
+    if (jobId && jobQuery.isError && status === 404) {
+      setNotice('That processing job was interrupted when the backend restarted. Please start it again.');
+      setJobId('');
+      void recentJobs.refetch();
+    }
+  }, [jobId, jobQuery.error, jobQuery.isError, recentJobs]);
+
+  useEffect(() => {
     window.localStorage.setItem('mediacraft-theme', themeMode);
     const media = window.matchMedia('(prefers-color-scheme: dark)');
     const applyTheme = () => {

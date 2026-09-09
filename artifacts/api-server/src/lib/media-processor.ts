@@ -341,6 +341,9 @@ async function createGeneratedSubtitle(job: MediaJob, directory: string): Promis
     durationSeconds: job.mediaInfo.durationSeconds,
     onRetry: () => event(job, "Gemini is briefly busy; retrying caption transcription once.", 46, "retrying-transcription"),
   });
+  if (!/\d{2}:\d{2}:\d{2}[,.]\d{3}\s*-->/.test(generated.srt)) {
+    throw new Error("No timed spoken dialogue was detected in this clip. Try a source with clear speech or upload an SRT/VTT file.");
+  }
   const srt = validateGeneratedSrt(generated.srt, job.mediaInfo.durationSeconds);
   const karaoke = job.subtitleMode === "karaoke";
   const subtitleText = karaoke && generated.words.length
