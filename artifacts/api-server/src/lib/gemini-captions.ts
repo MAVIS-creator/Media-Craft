@@ -110,38 +110,44 @@ Return JSON only in exactly this shape: {"srt":"1\\n00:00:00,000 --> 00:00:02,00
       },
     };
 
-    let response: Awaited<ReturnType<typeof client.models.generateContent>> | undefined;
+    let captionResult: z.infer<typeof CaptionPayload> | undefined;
     let lastError: unknown;
     for (let attempt = 1; attempt <= 2; attempt += 1) {
       try {
-        response = await client.models.generateContent(request);
+        const response = await client.models.generateContent(request);
+        const rawText = response.text?.trim() ?? "";
+        const jsonText = rawText
+          .replace(/^```(?:json)?\s*/i, "")
+          .replace(/\s*```$/, "");
+        let decoded: unknown;
+        try {
+          decoded = JSON.parse(jsonText);
+        } catch {
+          throw new Error("Gemini returned invalid caption JSON.");
+        }
+        const parsed = CaptionPayload.safeParse(decoded);
+        if (!parsed.success) {
+          throw new Error("Gemini returned an invalid caption payload.");
+        }
+        captionResult = parsed.data;
         break;
       } catch (error) {
         lastError = error;
         const message = error instanceof Error ? error.message : String(error);
-        const retryable = /\b(429|500|502|503|504)\b|unavailable|high demand|temporar/i.test(message);
+        const retryable =
+          /\b(429|500|502|503|504)\b|unavailable|high demand|temporar/i.test(message) ||
+          /invalid caption (?:JSON|payload)/i.test(message);
         if (!retryable || attempt === 2) break;
         input.onRetry?.();
         await sleep(2500);
       }
     }
-    if (!response) throw lastError instanceof Error ? lastError : new Error(String(lastError ?? "Gemini transcription failed."));
+    if (!captionResult) throw lastError instanceof Error ? lastError : new Error(String(lastError ?? "Gemini transcription failed."));
 
-    let decoded: unknown;
-    try {
-      decoded = JSON.parse(response.text ?? "");
-    } catch {
-      throw new Error("Gemini returned invalid caption JSON.");
-    }
-
-    const parsed = CaptionPayload.safeParse(decoded);
-    if (!parsed.success) {
-      throw new Error("Gemini returned an invalid caption payload.");
-    }
-    const words = (parsed.data.words ?? []).filter((word) =>
+    const words = (captionResult.words ?? []).filter((word) =>
       word.word.trim() && word.end > word.start && word.start <= input.durationSeconds + 2 && word.end <= input.durationSeconds + 2
     );
-    const validatedSrt = parsed.data.srt.replace(/\r\n/g, "\n").trim();
+    const validatedSrt = captionResult.srt.replace(/\r\n/g, "\n").trim();
     return {
       srt: validatedSrt,
       words: words.length ? words : deriveWordTimings(validatedSrt),

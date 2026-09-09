@@ -116,17 +116,58 @@ function presetInstruction(preset: MediaPreset): string {
   }[preset];
 }
 
-function runFfmpeg(args: string[]): Promise<{ code: number; stderr: string }> {
+function runFfmpeg(
+  args: string[],
+  options: {
+    durationSeconds?: number;
+    onProgress?: (fraction: number) => void;
+  } = {},
+): Promise<{ code: number; stderr: string }> {
   return new Promise((resolve) => {
-    const child = spawn("ffmpeg", args, { stdio: ["ignore", "ignore", "pipe"] });
+    const trackedArgs = options.durationSeconds
+      ? [...args.slice(0, -1), "-progress", "pipe:2", "-nostats", args.at(-1) as string]
+      : args;
+    const child = spawn("ffmpeg", trackedArgs, { stdio: ["ignore", "ignore", "pipe"] });
     let stderr = "";
+    let progressBuffer = "";
+    let settled = false;
+    const timeoutMs = options.durationSeconds
+      ? Math.min(15 * 60_000, Math.max(2 * 60_000, options.durationSeconds * 20_000))
+      : 0;
+    const timeout = timeoutMs
+      ? setTimeout(() => {
+          stderr += `\nMediaCraft stopped FFmpeg after ${Math.round(timeoutMs / 1000)} seconds without completion.`;
+          child.kill("SIGKILL");
+        }, timeoutMs)
+      : null;
+
     child.stderr.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString();
+      const text = chunk.toString();
+      stderr += text;
+      if (!options.durationSeconds || !options.onProgress) return;
+
+      progressBuffer += text;
+      const lines = progressBuffer.split(/\r?\n/);
+      progressBuffer = lines.pop() ?? "";
+      for (const line of lines) {
+        const match = line.match(/^out_time_(?:us|ms)=(\d+)$/);
+        if (!match) continue;
+        const elapsedSeconds = Number(match[1]) / 1_000_000;
+        options.onProgress(Math.max(0, Math.min(1, elapsedSeconds / options.durationSeconds)));
+      }
     });
     child.on("error", (error) => {
+      if (settled) return;
+      settled = true;
+      if (timeout) clearTimeout(timeout);
       resolve({ code: 1, stderr: error.message });
     });
-    child.on("close", (code) => resolve({ code: code ?? 1, stderr }));
+    child.on("close", (code) => {
+      if (settled) return;
+      settled = true;
+      if (timeout) clearTimeout(timeout);
+      resolve({ code: code ?? 1, stderr });
+    });
   });
 }
 
@@ -144,10 +185,10 @@ function deterministicPresetArgs(job: MediaJob, outputPath: string, subtitlePath
       return [
         "-y", "-i", input,
         "-vf", captionFilter === "ass"
-          ? `ass='${escapeSubtitleFilterPath(subtitlePath)}'`
-          : `subtitles='${escapeSubtitleFilterPath(subtitlePath)}':force_style='FontName=Arial,FontSize=28,Bold=1,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,Outline=3,Shadow=1,Alignment=2,MarginV=70'`,
+          ? `fps=30,ass='${escapeSubtitleFilterPath(subtitlePath)}'`
+          : `fps=30,subtitles='${escapeSubtitleFilterPath(subtitlePath)}':force_style='FontName=Arial,FontSize=28,Bold=1,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,Outline=3,Shadow=1,Alignment=2,MarginV=70'`,
         "-map", "0:v:0", "-map", "0:a?",
-        "-c:v", "libx264", "-preset", "medium", "-crf", "20",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "21",
         "-c:a", "aac", "-b:a", "192k", "-af", "loudnorm=I=-14:TP=-1.5:LRA=11",
         "-movflags", "+faststart",
         outputPath,
@@ -156,9 +197,9 @@ function deterministicPresetArgs(job: MediaJob, outputPath: string, subtitlePath
       if (!job.mediaInfo.hasVideo) throw new Error("Smart Reframe requires a video source.");
       return [
         "-y", "-i", input,
-        "-vf", "scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,setsar=1",
+        "-vf", "scale=1080:1920:force_original_aspect_ratio=increase:flags=fast_bilinear,crop=1080:1920,fps=30,setsar=1",
         "-map", "0:v:0", "-map", "0:a?",
-        "-c:v", "libx264", "-preset", "fast", "-crf", "21",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "22",
         "-c:a", "aac", "-b:a", "192k",
         "-movflags", "+faststart",
         outputPath,
@@ -170,9 +211,9 @@ function deterministicPresetArgs(job: MediaJob, outputPath: string, subtitlePath
       if (!job.mediaInfo.hasVideo) throw new Error("Vertical Reel requires a video source.");
       return [
         "-y", "-i", input,
-        "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
+        "-vf", "scale=1080:1920:force_original_aspect_ratio=increase:flags=fast_bilinear,crop=1080:1920,fps=30,setsar=1",
         "-map", "0:v:0", "-map", "0:a?",
-        "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
         "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart",
         outputPath,
       ];
@@ -189,9 +230,9 @@ function deterministicPresetArgs(job: MediaJob, outputPath: string, subtitlePath
       if (!subtitlePath) throw new Error("Attach an SRT/VTT caption file or choose Generate Captions from Audio before burning subtitles.");
       return [
         "-y", "-i", input,
-        "-vf", `subtitles='${escapeSubtitleFilterPath(subtitlePath)}':force_style='FontName=Arial,FontSize=24,Outline=2,Shadow=1,Alignment=2,MarginV=48'`,
+        "-vf", `fps=30,subtitles='${escapeSubtitleFilterPath(subtitlePath)}':force_style='FontName=Arial,FontSize=24,Outline=2,Shadow=1,Alignment=2,MarginV=48'`,
         "-map", "0:v:0", "-map", "0:a?",
-        "-c:v", "libx264", "-preset", "medium", "-crf", "20",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "21",
         "-c:a", "copy", "-movflags", "+faststart",
         outputPath,
       ];
@@ -199,8 +240,9 @@ function deterministicPresetArgs(job: MediaJob, outputPath: string, subtitlePath
       if (!job.mediaInfo.hasVideo) throw new Error("Web-Ready H.264 Compress requires a video source.");
       return [
         "-y", "-i", input,
+        "-vf", "fps=30",
         "-map", "0:v:0", "-map", "0:a?",
-        "-c:v", "libx264", "-preset", "medium", "-crf", "22",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
         "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart",
         outputPath,
       ];
@@ -242,8 +284,8 @@ async function buildTightenArgs(job: MediaJob, outputPath: string): Promise<stri
   if (job.mediaInfo.durationSeconds - cursor > 0.08) ranges.push([cursor, job.mediaInfo.durationSeconds]);
   if (ranges.length === 0) {
     return [
-      "-y", "-i", job.inputPath, "-map", "0:v:0", "-map", "0:a?",
-      "-c:v", "libx264", "-preset", "medium", "-crf", "22",
+      "-y", "-i", job.inputPath, "-vf", "fps=30", "-map", "0:v:0", "-map", "0:a?",
+      "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
       "-c:a", "aac", "-b:a", "192k", "-af", "loudnorm=I=-14:TP=-1.5:LRA=11",
       "-movflags", "+faststart", outputPath,
     ];
@@ -261,13 +303,13 @@ async function buildTightenArgs(job: MediaJob, outputPath: string): Promise<stri
     videoLabels.push(`[${v}]`);
     audioLabels.push(`[${a}]`);
   });
-  filterParts.push(`${videoLabels.join("")}concat=n=${ranges.length}:v=1:a=0[vout]`);
+  filterParts.push(`${videoLabels.join("")}concat=n=${ranges.length}:v=1:a=0,fps=30[vout]`);
   filterParts.push(`${audioLabels.join("")}concat=n=${ranges.length}:v=0:a=1, loudnorm=I=-14:TP=-1.5:LRA=11[aout]`);
   return [
     "-y", "-i", job.inputPath,
     "-filter_complex", filterParts.join(";"),
     "-map", "[vout]", "-map", "[aout]",
-    "-c:v", "libx264", "-preset", "medium", "-crf", "20",
+    "-c:v", "libx264", "-preset", "veryfast", "-crf", "21",
     "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart",
     outputPath,
   ];
@@ -554,7 +596,13 @@ async function processJob(id: string): Promise<void> {
       }
 
       event(job, `Render attempt ${attempt}/${attemptLimit} started.`, 72, "rendering");
-      const result = await runFfmpeg(args);
+      const result = await runFfmpeg(args, {
+        durationSeconds: job.mediaInfo.durationSeconds,
+        onProgress: (fraction) => {
+          job.progressPercent = Math.max(job.progressPercent, Math.min(96, 72 + Math.floor(fraction * 24)));
+          job.stage = "rendering";
+        },
+      });
       stderr = result.stderr;
       const outputStats = await stat(outputPath).catch(() => null);
 
