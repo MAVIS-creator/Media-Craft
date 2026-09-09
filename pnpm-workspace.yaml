@@ -159,7 +159,9 @@ overrides:
   "@esbuild-kit/esm-loader": "npm:tsx@^4.21.0"
   esbuild: "0.28.1"
   # Pin vulnerable transitive dependencies to their patched releases.
-  js-yaml: "4.3.1"
+  js-yaml: "4.3.2"
+  hono: "4.13.7"
+  qs: "6.16.0"
   fast-uri: "3.1.6"
   brace-expansion: "5.0.9"
   nanoid: "3.3.18"
