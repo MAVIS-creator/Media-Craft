@@ -486,7 +486,7 @@ function SettingsPanel({
               )}
             </div>
             <p className="mt-3 text-[10px] leading-relaxed text-slate-500">
-              ClickHouse and Grafana are optional observability services. If either is unavailable, uploads and FFmpeg processing continue locally in this session.
+              ClickHouse stores job analytics. Grafana receives completion and failure annotations through Replit's authenticated connector, while Grafana MCP supports live investigation. Observability never blocks media processing.
             </p>
           </div>
         </div>

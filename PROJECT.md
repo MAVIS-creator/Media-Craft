@@ -86,8 +86,6 @@ Use `.env.example` as a reference. Configure values through Replit Secrets or yo
 | `CLICKHOUSE_USER` | ClickHouse username, usually `default` |
 | `CLICKHOUSE_PASSWORD` | ClickHouse password |
 | `CLICKHOUSE_DATABASE` | ClickHouse database, usually `default` |
-| `GRAFANA_URL` | Grafana instance URL |
-| `GRAFANA_API_KEY` | Grafana service-account token/API key |
 | `GRAFANA_MCP_ENDPOINT` | Optional Grafana MCP endpoint exposed in telemetry |
 
 Gemini is required for a normal AI-planned job. Parallel, ClickHouse, and Grafana report their own connection status and use local fallback behavior where supported.
@@ -334,7 +332,7 @@ ClickHouse is used for analytics and observability, not for storing the uploaded
 
 ### Grafana
 
-Grafana receives operational annotations for completed and failed jobs. Each annotation includes:
+Grafana receives operational annotations for completed and failed jobs through Replit's authenticated Grafana connector. The application does not read or store a Grafana API key. Each annotation includes:
 
 - MediaCraft tags
 - Job ID
@@ -342,7 +340,9 @@ Grafana receives operational annotations for completed and failed jobs. Each ann
 - Selected preset
 - Source duration
 
-MediaCraft also tracks local telemetry such as active jobs, completed jobs, failed jobs, self-heal attempts, and the last FFmpeg error. The Settings/diagnostics view exposes the Grafana connection state without exposing the API key.
+MediaCraft also tracks local telemetry such as active jobs, completed jobs, failed jobs, self-heal attempts, and the last FFmpeg error. The Settings/diagnostics view probes Grafana through the connector and exposes connection state without exposing credentials.
+
+The separately attached Grafana Cloud MCP server is used for operator-side datasource health checks and live investigation. Application runtime traffic uses the connector because MCP tools are mounted for Replit Agent workflows, not directly inside the Node process.
 
 Grafana is used for operational visibility and annotations. It does not process or store the media output.
 

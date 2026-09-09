@@ -1,3 +1,4 @@
+import { ReplitConnectors, type ProxyOptions } from "@replit/connectors-sdk";
 import { logger } from "./logger";
 
 export type GrafanaTelemetryMetrics = {
@@ -25,51 +26,51 @@ let totalTokens = 0;
 let lastFfmpegErr = "";
 let status: GrafanaStatus = {
   provider: "grafana",
-  state: process.env.GRAFANA_URL && process.env.GRAFANA_API_KEY ? "error" : "not_configured",
+  state: "not_configured",
   lastCheckedAt: null,
   lastSuccessAt: null,
   lastWriteAt: null,
 };
 
-function grafanaUrl(path: string): string | null {
-  const base = process.env.GRAFANA_URL?.replace(/\/+$/, "");
-  return base ? `${base}${path}` : null;
-}
-
 function safeError(error: unknown): string {
   const message = (error instanceof Error ? error.message : String(error))
     .replace(/Bearer\s+\S+/gi, "Bearer [redacted]")
     .slice(0, 180);
-  if (message.includes("Grafana returned HTTP 503")) {
+  if (message.includes("HTTP 500") && message.includes("fetch failed")) {
+    return "Grafana connector could not reach the configured stack. Check the Grafana base URL in the Replit connection.";
+  }
+  if (message.includes("HTTP 503")) {
     return "Grafana is unavailable; media processing continues without telemetry.";
   }
-  if (message.includes("Grafana returned HTTP 401") || message.includes("Grafana returned HTTP 403")) {
-    return "Grafana rejected the telemetry credentials; media processing continues without telemetry.";
+  if (message.includes("HTTP 401") || message.includes("HTTP 403")) {
+    return "Grafana rejected the connected service account or its permissions; media processing continues without telemetry.";
   }
   return message;
 }
 
-async function grafanaRequest(path: string, init: RequestInit = {}): Promise<Response> {
-  const url = grafanaUrl(path);
-  const apiKey = process.env.GRAFANA_API_KEY;
-  if (!url || !apiKey) throw new Error("Grafana URL or API key is not configured.");
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
-  try {
-    const response = await fetch(url, {
-      ...init,
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        ...(init.headers ?? {}),
-      },
-      signal: controller.signal,
-    });
-    if (!response.ok) throw new Error(`Grafana returned HTTP ${response.status}`);
-    return response;
-  } finally {
-    clearTimeout(timeout);
+async function grafanaRequest(path: string, init: ProxyOptions = {}): Promise<Response> {
+  // Construct this per request so the SDK can renew the Replit identity used by
+  // the connector proxy. Grafana credentials never enter application code.
+  const connectors = new ReplitConnectors();
+  const response = await connectors.proxy("grafana", path, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(init.headers ?? {}),
+    },
+  });
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    let detail = "";
+    try {
+      const parsed = JSON.parse(body) as { error?: { message?: string }; message?: string };
+      detail = parsed.error?.message ?? parsed.message ?? "";
+    } catch {
+      detail = body;
+    }
+    throw new Error(`Grafana connector returned HTTP ${response.status}${detail ? `: ${detail.slice(0, 100)}` : ""}`);
   }
+  return response;
 }
 
 export function recordSelfHealEvent(err: string) {
@@ -96,14 +97,10 @@ export function getGrafanaTelemetry(jobStats: { active: number; completed: numbe
 }
 
 export async function probeGrafana(): Promise<GrafanaStatus> {
-  if (!grafanaUrl("/api/health") || !process.env.GRAFANA_API_KEY) {
-    status = { ...status, state: "not_configured", lastCheckedAt: new Date().toISOString(), lastError: "Grafana URL or API key not configured." };
-    return status;
-  }
   try {
     await grafanaRequest("/api/health", { method: "GET" });
     const now = new Date().toISOString();
-    status = { ...status, state: "connected", lastCheckedAt: now, lastSuccessAt: now };
+    status = { ...status, state: "connected", lastCheckedAt: now, lastSuccessAt: now, lastError: undefined };
   } catch (error) {
     status = { ...status, state: "error", lastCheckedAt: new Date().toISOString(), lastError: safeError(error) };
   }
@@ -112,7 +109,6 @@ export async function probeGrafana(): Promise<GrafanaStatus> {
 
 export function recordGrafanaJobEvent(input: { jobId: string; status: "succeeded" | "failed"; preset: string; durationSeconds: number }) {
   void (async () => {
-    if (!grafanaUrl("/api/annotations") || !process.env.GRAFANA_API_KEY) return;
     try {
       await grafanaRequest("/api/annotations", {
         method: "POST",
@@ -123,7 +119,7 @@ export function recordGrafanaJobEvent(input: { jobId: string; status: "succeeded
         }),
       });
       const now = new Date().toISOString();
-      status = { provider: "grafana", state: "connected", lastCheckedAt: now, lastSuccessAt: now, lastWriteAt: now };
+      status = { provider: "grafana", state: "connected", lastCheckedAt: now, lastSuccessAt: now, lastWriteAt: now, lastError: undefined };
       logger.info({ jobId: input.jobId, status: input.status }, "Sent MediaCraft job annotation to Grafana");
     } catch (error) {
       const message = safeError(error);
