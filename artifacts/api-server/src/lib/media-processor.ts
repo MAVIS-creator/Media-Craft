@@ -154,7 +154,15 @@ function deterministicPresetArgs(job: MediaJob, outputPath: string, subtitlePath
       ];
     case "smart-reframe":
       if (!job.mediaInfo.hasVideo) throw new Error("Smart Reframe requires a video source.");
-      return null;
+      return [
+        "-y", "-i", input,
+        "-vf", "scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,setsar=1",
+        "-map", "0:v:0", "-map", "0:a?",
+        "-c:v", "libx264", "-preset", "fast", "-crf", "21",
+        "-c:a", "aac", "-b:a", "192k",
+        "-movflags", "+faststart",
+        outputPath,
+      ];
     case "tighten-finish":
       if (!job.mediaInfo.hasVideo || !job.mediaInfo.hasAudio) throw new Error("Tighten & Finish requires video with an audio track.");
       return null;
@@ -478,7 +486,7 @@ async function processJob(id: string): Promise<void> {
   try {
     if (
       job.preset === "generate-subtitles" ||
-      (job.preset === "captions-hook" && job.subtitleMode !== "none") ||
+      (job.preset === "captions-hook" && job.subtitleMode !== "none" && job.subtitleMode !== "upload") ||
       (job.preset === "burn-subtitles" && job.subtitleMode === "generate")
     ) {
       await createGeneratedSubtitle(job, directory);

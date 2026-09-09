@@ -6,7 +6,8 @@ const GeminiArgsPayload = z.object({
   args: z.array(z.string()).min(3).max(80),
 });
 
-const forbiddenToken = /[\u0000\r\n;|&$<>`]/;
+const forbiddenToken = /[\u0000\r\n|&$<>`]/;
+const filterGraphFlags = new Set(["-filter_complex", "-lavfi"]);
 const inputPlaceholder = "__INPUT__";
 const outputPlaceholder = "__OUTPUT__";
 type OutputKind = "audio" | "video";
@@ -20,6 +21,19 @@ function containsUnsafePathOrProtocol(arg: string): boolean {
   // These filters can open another file from inside FFmpeg. Generated plans
   // must stay single-input and server-owned, so they are not allowed here.
   return /(?:^|[;,])(?:movie|amovie|subtitles|ass|drawtext|fontfile|textfile)=/i.test(arg);
+}
+
+function containsUnsafeSyntax(arg: string, index: number, args: string[]): boolean {
+  if (forbiddenToken.test(arg)) return true;
+
+  // A semicolon is FFmpeg's valid separator between chains in a complex
+  // filter graph. It is not interpreted by a shell because args are passed
+  // directly to spawn(), but keep it forbidden in every non-filter argument.
+  if (arg.includes(";") && !filterGraphFlags.has(args[index - 1] ?? "")) {
+    return true;
+  }
+
+  return false;
 }
 
 function requireApiKey(): string {
@@ -61,8 +75,8 @@ function parseResponse(text: string | undefined, outputKind: OutputKind): string
 
   if (
     args.some(
-      (arg) =>
-        forbiddenToken.test(arg) ||
+      (arg, index) =>
+        containsUnsafeSyntax(arg, index, args) ||
         (arg !== inputPlaceholder && arg !== outputPlaceholder && containsUnsafePathOrProtocol(arg)),
     )
   ) {
